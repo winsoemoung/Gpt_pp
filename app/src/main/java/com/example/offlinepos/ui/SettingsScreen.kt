@@ -89,6 +89,8 @@ fun SettingsScreen(
     val auditEvents by viewModel.auditEvents.collectAsState()
 
     var backupStatusMessage by remember { mutableStateOf<String?>(null) }
+    var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
+    var showRestoreChoice by remember { mutableStateOf(false) }
     var showCandlestickChart by remember {
         mutableStateOf(context.getSharedPreferences("pos_settings", 0).getBoolean("show_sales_candlestick", true))
     }
@@ -136,11 +138,8 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.importDatabaseFile(uri) { success, msg ->
-                backupStatusMessage = msg
-                viewModel.setBanner(msg)
-                if (success) (context as? Activity)?.recreate()
-            }
+            pendingRestoreUri = uri
+            showRestoreChoice = true
         }
     }
 
@@ -968,6 +967,63 @@ fun SettingsScreen(
         }
     }
 
+    if (showRestoreChoice && pendingRestoreUri != null) {
+        Dialog(onDismissRequest = {
+            showRestoreChoice = false
+            pendingRestoreUri = null
+        }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.padding(16.dp),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Choose Database Import Mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Replace mode သည် လက်ရှိ database တစ်ခုလုံးကို backup file ဖြင့် အစားထိုးမည်။ Merge mode သည် Product များကိုသာ ပေါင်းထည့်ပြီး ရှိပြီးသား data များကို မဖျက်ပါ။",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val uri = pendingRestoreUri
+                            showRestoreChoice = false
+                            pendingRestoreUri = null
+                            if (uri != null) viewModel.importDatabaseFile(uri) { success, msg ->
+                                backupStatusMessage = msg
+                                viewModel.setBanner(msg)
+                                if (success) (context as? Activity)?.recreate()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Replace Current Database") }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val uri = pendingRestoreUri
+                            showRestoreChoice = false
+                            pendingRestoreUri = null
+                            if (uri != null) viewModel.mergeProductsFromDatabase(uri) { success, msg ->
+                                backupStatusMessage = msg
+                                viewModel.setBanner(msg)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Merge Products Only") }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextButton(
+                        onClick = {
+                            showRestoreChoice = false
+                            pendingRestoreUri = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Cancel") }
+                }
+            }
+        }
+    }
     if (showServerDialog) {
         ServerStatusDialog(
             viewModel = viewModel,

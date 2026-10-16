@@ -1731,6 +1731,78 @@ class PosViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    /**
+     * Import only products from a backup database and merge them into the current database.
+     * Existing products are matched by SKU first and barcode second; matching rows are skipped.
+     * This keeps current sales, customers, stock movements and settings untouched.
+     */
+    fun mergeProductsFromDatabase(sourceUri: Uri, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            var staged: File? = null
+            try {
+                val parent = context.cacheDir
+                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                staged = File(parent, "product_merge_$timestamp.db")
+                context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                    FileOutputStream(staged).use { output -> input.copyTo(output) }
+                } ?: error("ရွေးထားသော backup ဖိုင်ကို ဖတ်မရပါ")
+
+                var imported = 0
+                var skipped = 0
+                SQLiteDatabase.openDatabase(staged.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { sourceDb ->
+                    sourceDb.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                        require(cursor.moveToFirst() && cursor.getString(0) == "ok") { "Backup integrity check မအောင်မြင်ပါ" }
+                    }
+                    sourceDb.rawQuery("SELECT * FROM products", null).use { cursor ->
+                        val nameIndex = cursor.getColumnIndexOrThrow("name")
+                        val skuIndex = cursor.getColumnIndexOrThrow("sku")
+                        val barcodeIndex = cursor.getColumnIndexOrThrow("barcode")
+                        val costIndex = cursor.getColumnIndexOrThrow("costPriceMinor")
+                        val sellIndex = cursor.getColumnIndexOrThrow("sellPriceMinor")
+                        val stockIndex = cursor.getColumnIndexOrThrow("stockQuantity")
+                        val activeIndex = cursor.getColumnIndexOrThrow("isActive")
+                        val updatedIndex = cursor.getColumnIndexOrThrow("updatedAtEpochMs")
+                        val categoryIndex = cursor.getColumnIndexOrThrow("category")
+                        val roofIndex = cursor.getColumnIndexOrThrow("isRoofingSheet")
+                        val lowIndex = cursor.getColumnIndexOrThrow("lowStockThreshold")
+                        val imageIndex = cursor.getColumnIndexOrThrow("imageUri")
+                        val wholesaleIndex = cursor.getColumnIndexOrThrow("wholesalePriceMinor")
+                        val wholesaleMinIndex = cursor.getColumnIndexOrThrow("wholesaleMinQty")
+                        val unitIndex = cursor.getColumnIndexOrThrow("unitName")
+                        while (cursor.moveToNext()) {
+                            val sku = cursor.getString(skuIndex).trim()
+                            val barcode = cursor.getString(barcodeIndex)?.trim()?.ifBlank { null }
+                            if (sku.isBlank() || db.productDao().findBySku(sku) != null ||
+                                (barcode != null && db.productDao().findByBarcode(barcode) != null)) {
+                                skipped++
+                                continue
+                            }
+                            db.productDao().insert(
+                                ProductEntity(
+                                    name = cursor.getString(nameIndex), sku = sku, barcode = barcode,
+                                    costPriceMinor = cursor.getLong(costIndex), sellPriceMinor = cursor.getLong(sellIndex),
+                                    stockQuantity = cursor.getLong(stockIndex), isActive = cursor.getInt(activeIndex) != 0,
+                                    updatedAtEpochMs = cursor.getLong(updatedIndex), category = cursor.getString(categoryIndex),
+                                    isRoofingSheet = cursor.getInt(roofIndex) != 0, lowStockThreshold = cursor.getLong(lowIndex),
+                                    imageUri = cursor.getString(imageIndex), wholesalePriceMinor = cursor.getLong(wholesaleIndex),
+                                    wholesaleMinQty = cursor.getLong(wholesaleMinIndex), unitName = cursor.getString(unitIndex),
+                                )
+                            )
+                            imported++
+                        }
+                    }
+                }
+                staged.delete()
+                withContext(Dispatchers.Main) {
+                    onComplete(true, "Product merge အောင်မြင်ပါသည်။ အသစ်ထည့်: $imported ခု၊ ရှိပြီးသား/ကျော်ခဲ့: $skipped ခု")
+                }
+            } catch (e: Exception) {
+                staged?.delete()
+                withContext(Dispatchers.Main) { onComplete(false, "Product merge မအောင်မြင်ပါ: ${e.message}") }
+            }
+        }
+    }
+
     fun setDateFilter(startMs: Long, endMs: Long) {
         _filterStartDate.value = startMs
         _filterEndDate.value = endMs

@@ -88,6 +88,15 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Preserved accessibility content descriptions and Material 3 touch targets.
 - Version 5.0.1 / versionCode 8.
 
+## New5-3 database import update
+
+- Restore now asks the user to choose between `Replace Current Database` and `Merge Products Only`.
+- Replace mode preserves the existing full-database restore behavior and creates a pre-restore backup.
+- Merge mode reads products from the selected SQLite backup and inserts only new products into the current database.
+- Merge matching rules: SKU first, then barcode; duplicates are skipped and existing sales/customers/stock movements are not replaced.
+- The merge result reports inserted and skipped product counts.
+- Version 5.0.2 / versionCode 9.
+
 ### Known scope not included in New5
 
 - Supplier debt/payment ledger is not yet a separate accounting module; purchase supplier totals and invoice references are available.
