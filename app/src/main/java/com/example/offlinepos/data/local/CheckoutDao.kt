@@ -43,6 +43,12 @@ abstract class CheckoutDao {
     )
     abstract suspend fun reduceStock(productId: Long, qty: Long, now: Long): Int
 
+    @Query("UPDATE products SET stockQuantity = stockQuantity + :qty, updatedAtEpochMs = :now WHERE productId = :productId")
+    abstract suspend fun restoreStock(productId: Long, qty: Long, now: Long): Int
+
+    @Query("UPDATE sales SET status = :status WHERE saleId = :saleId AND status = 'COMPLETED'")
+    abstract suspend fun updateSaleStatus(saleId: String, status: String): Int
+
     @Transaction
     open suspend fun commitSale(
         sale: SaleEntity,
@@ -61,5 +67,28 @@ abstract class CheckoutDao {
         insertItems(items)
         insertPayment(payment)
         insertAudit(audit)
+    }
+
+    @Transaction
+    open suspend fun refundSale(saleId: String, now: Long, actorId: String): Boolean {
+        val updated = updateSaleStatus(saleId, SaleStatus.REFUNDED)
+        if (updated != 1) return false
+        getItemsForSale(saleId).forEach { line ->
+            check(restoreStock(line.productId, line.quantity, now) == 1) { "Product not found" }
+        }
+        insertAudit(
+            AuditEventEntity(
+                eventId = java.util.UUID.randomUUID().toString(),
+                actorId = actorId,
+                action = "SALE_REFUNDED",
+                aggregateType = "SALE",
+                aggregateId = saleId,
+                reason = "Full sale return",
+                approverId = null,
+                createdAtEpochMs = now,
+                payloadHash = "",
+            )
+        )
+        return true
     }
 }

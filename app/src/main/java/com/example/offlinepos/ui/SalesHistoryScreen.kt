@@ -117,6 +117,7 @@ fun SalesHistoryScreen(
     var showCustomRangeDialog by remember { mutableStateOf(false) }
     var showStockInDialog by remember { mutableStateOf(false) }
     var showShiftReportDialog by remember { mutableStateOf(false) }
+    var saleToRefund by remember { mutableStateOf<SaleEntity?>(null) }
 
     var customStartMs by remember { mutableStateOf(PosViewModel.getStartOfToday()) }
     var customEndMs by remember { mutableStateOf(PosViewModel.getEndOfToday()) }
@@ -288,7 +289,11 @@ fun SalesHistoryScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             items(filteredSales, key = { it.saleId }) { sale ->
-                                SaleRecordCard(sale = sale, onClick = { viewModel.viewPastReceipt(sale) })
+                                SaleRecordCard(
+                                    sale = sale,
+                                    onClick = { viewModel.viewPastReceipt(sale) },
+                                    onRefund = { saleToRefund = sale },
+                                )
                             }
                         }
                     }
@@ -518,12 +523,25 @@ fun SalesHistoryScreen(
             }
         )
     }
+    saleToRefund?.let { sale ->
+        ConfirmDeleteDialog(
+            title = "Return / Refund အတည်ပြုပါ",
+            message = "Sale #${sale.saleId.take(8)} ကို ပြန်အပ်ပြီး stock ပြန်တိုးမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။",
+            confirmText = "Return ပြုလုပ်မည်",
+            onConfirm = {
+                viewModel.refundSale(sale.saleId) { _, message -> viewModel.setBanner(message) }
+                saleToRefund = null
+            },
+            onDismiss = { saleToRefund = null },
+        )
+    }
 }
 
 @Composable
 private fun SaleRecordCard(
     sale: SaleEntity,
     onClick: () -> Unit,
+    onRefund: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -600,6 +618,13 @@ private fun SaleRecordCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
+                if (sale.status == com.example.offlinepos.data.local.SaleStatus.COMPLETED) {
+                    TextButton(onClick = onRefund, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                        Text("Return / Refund", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    Text(sale.status, fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }

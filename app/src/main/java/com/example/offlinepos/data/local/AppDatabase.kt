@@ -17,9 +17,10 @@ import androidx.room.RoomDatabase
         PurchaseEntity::class,
         ShiftReportEntity::class,
         ParkedOrderEntity::class,
+        StockMovementEntity::class,
     ],
-    version = 4,
-    exportSchema = false
+    version = 5,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
@@ -38,7 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DB_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_3_4, MIGRATION_4_5)
                     .build().also { INSTANCE = it }
             }
 

@@ -18,7 +18,27 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS stock_movements (
+            movementId TEXT NOT NULL PRIMARY KEY,
+            productId INTEGER NOT NULL,
+            movementType TEXT NOT NULL,
+            quantityChange INTEGER NOT NULL,
+            quantityBefore INTEGER NOT NULL,
+            quantityAfter INTEGER NOT NULL,
+            referenceId TEXT,
+            reason TEXT,
+            actorId TEXT NOT NULL,
+            createdAtEpochMs INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_stock_movements_productId ON stock_movements(productId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_stock_movements_createdAtEpochMs ON stock_movements(createdAtEpochMs)")
+    }
+}
+
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
-    MIGRATION_3_4
+    MIGRATION_3_4,
+    MIGRATION_4_5,
 )

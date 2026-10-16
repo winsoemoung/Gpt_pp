@@ -42,6 +42,14 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Quick actions use compact icon tiles with clear color hierarchy and remain reachable before product search.
 - Version 3.0.0 / versionCode 3.
 
+## New3-2 reliability update
+
+- Full-sale Return/Refund action from Sales History with confirmation and stock restoration.
+- Atomic stock movement ledger with Room migration 4→5 for manual adjustments.
+- SKU conflicts are reported instead of silently dropping a duplicate barcode.
+- Backup export/import runs SQLite integrity validation and retains the newest three backup files.
+- Version 3.2.0 / versionCode 4.
+
 ## Requirements
 
 - Android Studio with Android SDK 36

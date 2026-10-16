@@ -29,6 +29,7 @@ import com.example.offlinepos.data.local.PurchaseEntity
 import com.example.offlinepos.data.local.SaleEntity
 import com.example.offlinepos.data.local.SaleItemEntity
 import com.example.offlinepos.data.local.ShiftReportEntity
+import com.example.offlinepos.data.local.StockMovementEntity
 import com.example.offlinepos.hardware.PdfReceiptHelper
 import org.json.JSONArray
 import org.json.JSONObject
@@ -137,6 +138,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
     // Purchases Flow
     val purchases: StateFlow<List<PurchaseEntity>> = db.operationsDao().observeAllPurchases()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val stockMovements: StateFlow<List<StockMovementEntity>> = db.operationsDao().observeStockMovements()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Shifts Flow
@@ -1486,8 +1489,31 @@ class PosViewModel(private val context: Context) : ViewModel() {
     fun adjustStock(productId: Long, adjustment: Long) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            db.productDao().adjustStock(productId, adjustment, now)
-            setBanner("လက်ကျန်စာရင်း ပြင်ဆင်ပြီးပါပြီ")
+            val before = db.productDao().findById(productId)?.stockQuantity ?: return@launch
+            if (db.productDao().adjustStock(productId, adjustment, now) == 1) {
+                db.operationsDao().insertStockMovement(
+                    StockMovementEntity(
+                        movementId = UUID.randomUUID().toString(), productId = productId,
+                        movementType = "ADJUSTMENT", quantityChange = adjustment,
+                        quantityBefore = before, quantityAfter = before + adjustment,
+                        reason = "Manual inventory adjustment", createdAtEpochMs = now,
+                    )
+                )
+                setBanner("လက်ကျန်စာရင်း ပြင်ဆင်ပြီးပါပြီ")
+            }
+        }
+    }
+
+    fun refundSale(saleId: String, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val success = db.checkoutDao().refundSale(saleId, System.currentTimeMillis(), _actor.value.userId)
+                withContext(Dispatchers.Main) {
+                    onComplete(success, if (success) "Sale #${saleId.take(8)} ကို Return/Refund ပြုလုပ်ပြီး stock ပြန်တိုးပေးပါပြီ" else "ဤ sale ကို Return မလုပ်နိုင်ပါ (ပြီးသားဖြစ်နိုင်ပါသည်)")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onComplete(false, "Return မအောင်မြင်ပါ: ${e.message}") }
+            }
         }
     }
 
@@ -1537,6 +1563,15 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     input.copyTo(output)
                 }
             }
+            SQLiteDatabase.openDatabase(targetFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { checkDb ->
+                checkDb.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                    require(cursor.moveToFirst() && cursor.getString(0) == "ok") { "Backup integrity check မအောင်မြင်ပါ" }
+                }
+            }
+            exportDir.listFiles { file -> file.name.startsWith("santhit_pos_backup_") && file.extension == "db" }
+                ?.sortedByDescending { it.lastModified() }
+                ?.drop(3)
+                ?.forEach { it.delete() }
             targetFile
         } catch (e: Exception) {
             null
@@ -1565,6 +1600,9 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
                 require(staged.length() >= 16) { "Backup ဖိုင်အရွယ်အစား မမှန်ပါ" }
                 SQLiteDatabase.openDatabase(staged.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { imported ->
+                    imported.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                        require(cursor.moveToFirst() && cursor.getString(0) == "ok") { "Backup integrity check မအောင်မြင်ပါ" }
+                    }
                     imported.rawQuery("SELECT COUNT(*) FROM products", null).use { cursor ->
                         require(cursor.moveToFirst()) { "products table မတွေ့ပါ" }
                         val productCount = cursor.getInt(0)
@@ -1657,6 +1695,10 @@ class PosViewModel(private val context: Context) : ViewModel() {
             val cleanName = dto.name.trim()
             val cleanBarcode = dto.barcode?.trim()?.ifBlank { null }
             val cleanSku = dto.sku.trim().ifBlank { "PROD-${System.currentTimeMillis() % 1000000}" }
+            val skuConflict = db.productDao().findBySku(cleanSku)
+            if (skuConflict != null && (cleanBarcode.isNullOrBlank() || skuConflict.barcode != cleanBarcode)) {
+                return@withContext Pair(false, "SKU [$cleanSku] သည် [${skuConflict.name}] တွင် အသုံးပြုပြီးသားဖြစ်ပါသည်။ Conflict ကို စစ်ဆေးပြီးမှ ထပ်ထည့်ပါ။")
+            }
 
             // 1. If barcode exists, check if product already in database
             if (!cleanBarcode.isNullOrBlank()) {
@@ -1716,9 +1758,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
             try {
                 db.productDao().insert(newEntity)
             } catch (e: Exception) {
-                // If unique constraint error occurs on barcode, insert with barcode null
-                android.util.Log.w("PosViewModel", "Barcode unique constraint fallback: ${e.message}")
-                db.productDao().insert(newEntity.copy(barcode = null))
+                return@withContext Pair(false, "Barcode/SKU conflict ဖြစ်နေပါသည်။ ရှိပြီးသား product ကို မဖျက်ဘဲ conflict ကို အရင်ဖြေရှင်းပါ။")
             }
             _serverReceivedCount.value = _serverReceivedCount.value + 1
             withContext(Dispatchers.Main) {

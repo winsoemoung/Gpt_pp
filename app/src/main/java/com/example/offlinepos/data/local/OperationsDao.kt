@@ -30,6 +30,12 @@ interface OperationsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPurchase(purchase: PurchaseEntity): Long
 
+    @Query("SELECT * FROM stock_movements ORDER BY createdAtEpochMs DESC LIMIT :limit")
+    fun observeStockMovements(limit: Int = 200): Flow<List<StockMovementEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertStockMovement(movement: StockMovementEntity)
+
     // Parked Orders (Hold Orders)
     @Query("SELECT * FROM parked_orders ORDER BY createdAtEpochMs DESC")
     fun observeParkedOrders(): Flow<List<ParkedOrderEntity>>
