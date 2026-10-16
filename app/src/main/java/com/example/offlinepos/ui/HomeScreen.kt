@@ -218,6 +218,14 @@ fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
+            QuickActionsRow(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                onScan = { showScanner = true },
+                onHeldOrders = { showHoldOrders = true },
+                onCustomers = { showCustomerLedger = true },
+                onShiftReport = { showShiftReport = true },
+            )
+
             // Search Bar & Construction Category Filters
             Column(
                 modifier = Modifier
@@ -546,6 +554,64 @@ private fun DashboardMetricCard(
                 Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(detail, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionsRow(
+    modifier: Modifier = Modifier,
+    onScan: () -> Unit,
+    onHeldOrders: () -> Unit,
+    onCustomers: () -> Unit,
+    onShiftReport: () -> Unit,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = "အမြန်လုပ်ဆောင်ရန်",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 2.dp, bottom = 6.dp),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { QuickActionTile("Barcode", "Scan", Icons.Default.QrCodeScanner, Color(0xFF2563EB), onScan) }
+            item { QuickActionTile("Held", "Orders", Icons.Default.PauseCircleOutline, Color(0xFF7C3AED), onHeldOrders) }
+            item { QuickActionTile("Customers", "Ledger", Icons.Default.People, Color(0xFF059669), onCustomers) }
+            item { QuickActionTile("Shift", "Report", Icons.Default.Assessment, Color(0xFFB45309), onShiftReport) }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionTile(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.22f)),
+        modifier = Modifier.width(104.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(shape = CircleShape, color = accent.copy(alpha = 0.14f), modifier = Modifier.size(30.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
+                }
+            }
+            Spacer(modifier = Modifier.width(7.dp))
+            Column {
+                Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(subtitle, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
     }

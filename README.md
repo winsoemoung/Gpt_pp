@@ -36,6 +36,12 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - The register header uses a clean store title without an `Offline` badge.
 - Database destructive-migration fallback is disabled so an unsupported schema change cannot silently erase shop data.
 
+## New3 UI refresh
+
+- Added a modern quick-action strip on the register dashboard for Barcode Scan, Held Orders, Customers, and Shift Report.
+- Quick actions use compact icon tiles with clear color hierarchy and remain reachable before product search.
+- Version 3.0.0 / versionCode 3.
+
 ## Requirements
 
 - Android Studio with Android SDK 36
