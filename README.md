@@ -97,6 +97,22 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - The merge result reports inserted and skipped product counts.
 - Version 5.0.2 / versionCode 9.
 
+## New5-4 AI Stock Planner update
+
+- Added always-available local sales forecasting for Daily, Weekly, Monthly, 3 Months, 6 Months, and 12 Months.
+- Forecast uses net sold quantities after product returns and combines selected-period velocity with the last 365 days.
+- Added average daily sales, 90-day demand forecast, stock coverage days, safety stock, reorder quantity, estimated budget, and 90-day stock-out warning.
+- Added `AI Stock Planner` UI card in the Reorder Reports tab.
+- When a Gemini API key is configured, the planner sends an anonymized product summary for Burmese explanations and seasonal purchase advice.
+- Without Gemini or internet, the local forecast and reorder recommendation continue to work.
+- AI request is analysis-only and does not execute stock or price changes.
+- Version 5.1.0 / versionCode 10.
+
+### New5-4 forecast scope
+
+- Supplier lead time, purchase orders, holidays, and weather are not yet modeled because those data fields are not present in the current database.
+- Gemini recommendations are advisory; the app does not automatically create purchase orders or change stock.
+
 ### Known scope not included in New5
 
 - Supplier debt/payment ledger is not yet a separate accounting module; purchase supplier totals and invoice references are available.

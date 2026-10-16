@@ -521,6 +521,7 @@ fun SalesHistoryScreen(
                         allProducts = allProducts,
                         storeProfile = storeProfile,
                         onOpenStockIn = { showStockInDialog = true },
+                        onRequestAiAdvice = { prompt, onComplete -> viewModel.requestStockRecommendationAi(prompt, onComplete) },
                     )
                 }
             }
@@ -805,6 +806,7 @@ fun ReorderAndPeriodicReportView(
     allProducts: List<ProductEntity>,
     storeProfile: StoreProfile,
     onOpenStockIn: () -> Unit,
+    onRequestAiAdvice: (String, (String) -> Unit) -> Unit,
 ) {
     var selectedPeriod by remember { mutableStateOf(PeriodicReportType.WEEKLY_SUNDAY) }
     val context = LocalContext.current
@@ -854,7 +856,19 @@ fun ReorderAndPeriodicReportView(
     // Product sold quantities in this period
     val productSoldQtyMap = remember(periodSaleItems) {
         periodSaleItems.groupBy { it.productId }
-            .mapValues { (_, items) -> items.sumOf { it.quantity } }
+            .mapValues { (_, items) -> items.sumOf { (it.quantity - it.returnedQuantity).coerceAtLeast(0L) } }
+    }
+    val annualStartMs = now - (365L * 24 * 60 * 60 * 1000)
+    val annualSaleItems = remember(allSaleItems, salesMap) {
+        allSaleItems.filter { item ->
+            val sale = salesMap[item.saleId]
+            sale != null && sale.createdAtEpochMs >= annualStartMs && sale.status != "VOIDED"
+        }
+    }
+    val annualSoldQtyMap = remember(annualSaleItems) {
+        annualSaleItems.groupBy { it.productId }.mapValues { (_, items) ->
+            items.sumOf { (it.quantity - it.returnedQuantity).coerceAtLeast(0L) }
+        }
     }
 
     data class MonthTopProduct(val productName: String, val totalQty: Long)
@@ -879,17 +893,35 @@ fun ReorderAndPeriodicReportView(
     data class ReorderRecommendation(
         val product: ProductEntity,
         val soldInPeriod: Long,
+        val averageDaily: Double,
+        val forecast90Days: Long,
+        val coverageDays: Long,
         val suggestedReorderQty: Long,
         val urgency: String,
         val estimatedCost: Long,
     )
 
     val recommendations = remember(allProducts, productSoldQtyMap, selectedPeriod) {
+        val periodDays = when (selectedPeriod) {
+            PeriodicReportType.DAILY -> 1L
+            PeriodicReportType.WEEKLY_SUNDAY -> 7L
+            PeriodicReportType.MONTHLY_FIRST -> 30L
+            PeriodicReportType.QUARTERLY_3M -> 90L
+            PeriodicReportType.HALF_YEAR_6M -> 180L
+            PeriodicReportType.ANNUAL_12M -> 365L
+        }
         allProducts.map { prod ->
             val sold = productSoldQtyMap[prod.productId] ?: 0L
+            val annualSold = annualSoldQtyMap[prod.productId] ?: 0L
+            val recentRate = sold.toDouble() / periodDays.toDouble()
+            val annualRate = annualSold.toDouble() / 365.0
+            val averageDaily = maxOf(recentRate, annualRate)
+            val forecast90 = kotlin.math.ceil(averageDaily * 90.0).toLong()
+            val coverageDays = if (averageDaily > 0.0) (prod.stockQuantity / averageDaily).toLong() else Long.MAX_VALUE
             val isLow = prod.stockQuantity <= prod.lowStockThreshold
             val urgency = when {
                 prod.stockQuantity <= 0 -> "🔴 ပြတ်လပ်နေပါသည် (ချက်ချင်းမှာယူပါ)"
+                coverageDays <= 90 -> "🟠 ၃ လအတွင်း ပြတ်နိုင် (ကြိုမှာပါ)"
                 isLow -> "🔴 လက်ကျန်နည်းနေပါသည် (အရေးပေါ်မှာယူပါ)"
                 sold > prod.stockQuantity -> "🟡 ရောင်းအားသွက် (ကြိုတင်မှာယူပါ)"
                 sold > 0 -> "🟢 ရောင်းအားကောင်း (ပိုမှာသင့်သည်)"
@@ -897,7 +929,7 @@ fun ReorderAndPeriodicReportView(
             }
 
             val baseNeeded = when {
-                sold > 0 -> (sold * 1.3).toLong().coerceAtLeast(prod.lowStockThreshold * 2)
+                averageDaily > 0 -> kotlin.math.ceil(forecast90 * 1.20).toLong().coerceAtLeast(prod.lowStockThreshold * 2)
                 else -> prod.lowStockThreshold * 2
             }
             val suggested = (baseNeeded - prod.stockQuantity).coerceAtLeast(0L)
@@ -906,6 +938,9 @@ fun ReorderAndPeriodicReportView(
             ReorderRecommendation(
                 product = prod,
                 soldInPeriod = sold,
+                averageDaily = averageDaily,
+                forecast90Days = forecast90,
+                coverageDays = coverageDays,
                 suggestedReorderQty = if (rounded > 0) rounded else (if (isLow) prod.lowStockThreshold * 2 else 0L),
                 urgency = urgency,
                 estimatedCost = (if (rounded > 0) rounded else (if (isLow) prod.lowStockThreshold * 2 else 0L)) * prod.costPriceMinor
@@ -918,6 +953,8 @@ fun ReorderAndPeriodicReportView(
 
     val totalEstimatedBudget = recommendations.sumOf { it.estimatedCost }
     val totalItemsToReorder = recommendations.count { it.suggestedReorderQty > 0 }
+    var aiAdvice by remember { mutableStateOf<String?>(null) }
+    var isAiLoading by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth().fillMaxHeight(),
@@ -1023,6 +1060,53 @@ fun ReorderAndPeriodicReportView(
             }
         }
 
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)),
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("AI Stock Planner", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(
+                        "Offline forecast ကို အမြဲအသုံးပြုနိုင်ပါသည်။ Gemini API key ရှိပါက ရာသီအလိုက် ရောင်းအားနှင့် ၃ လကြိုတင်မှာယူရန် အကြောင်းပြချက်ကို ထပ်ရှင်းပြပေးမည်။",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            isAiLoading = true
+                            val prompt = buildString {
+                                append("Stock forecast and purchase planning for the next 90 days. Explain in Burmese. Use only this summary; do not execute actions.\n")
+                                recommendations.filter { it.suggestedReorderQty > 0 }.take(12).forEach { rec ->
+                                    append("${rec.product.name} SKU=${rec.product.sku}, stock=${rec.product.stockQuantity}, avgDaily=${"%.2f".format(rec.averageDaily)}, coverageDays=${rec.coverageDays}, forecast90=${rec.forecast90Days}, suggested=${rec.suggestedReorderQty}.\n")
+                                }
+                            }
+                            onRequestAiAdvice(prompt) { response ->
+                                aiAdvice = response
+                                isAiLoading = false
+                            }
+                        },
+                        enabled = !isAiLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 7.dp),
+                    ) {
+                        Text(if (isAiLoading) "Gemini စဉ်းစားနေပါသည်..." else "Gemini AI အကြံပြုချက် ရယူမည်", fontSize = 11.5.sp)
+                    }
+                    aiAdvice?.let { advice ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        ) {
+                            Text(advice, modifier = Modifier.padding(10.dp), fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
         // Monthly Best Sellers Section
         item {
             Card(
@@ -1118,6 +1202,12 @@ fun ReorderAndPeriodicReportView(
                         Text("လက်ရှိ လက်ကျန်: ${rec.product.stockQuantity} ခု", fontSize = 11.sp)
                         Text("ကာလအတွင်း ရောင်းရ: ${rec.soldInPeriod} ခု", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        "ပျမ်းမျှ ${"%.1f".format(rec.averageDaily)}/နေ့ • 90-day forecast: ${rec.forecast90Days} • coverage: ${if (rec.coverageDays == Long.MAX_VALUE) "∞" else "${rec.coverageDays} days"}",
+                        fontSize = 10.sp,
+                        color = if (rec.coverageDays <= 90) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
                     if (rec.suggestedReorderQty > 0) {
                         Spacer(modifier = Modifier.height(4.dp))

@@ -631,6 +631,36 @@ class PosViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    fun requestStockRecommendationAi(prompt: String, onComplete: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val productsSnapshot = allProducts.value
+                val salesSnapshot = salesHistory.value
+                val lowStock = productsSnapshot.filter { it.stockQuantity <= it.lowStockThreshold }
+                val debtors = customers.value.filter { it.currentDebtMinor > 0 }
+                val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                val dbContext = com.example.offlinepos.ai.PosDatabaseContext(
+                    products = productsSnapshot,
+                    sales = salesSnapshot,
+                    customers = customers.value,
+                    categories = categories.value,
+                    storeProfile = _storeProfile.value,
+                    totalRevenue = salesSnapshot.sumOf { it.totalMinor },
+                    todayRevenue = salesSnapshot.filter { it.businessDate == today }.sumOf { it.totalMinor },
+                    todaySalesCount = salesSnapshot.count { it.businessDate == today },
+                    lowStockCount = lowStock.size,
+                    lowStockProducts = lowStock,
+                    debtors = debtors,
+                    totalDebtAmount = debtors.sumOf { it.currentDebtMinor },
+                )
+                val (response, _) = aiEngine.processUserCommand(prompt, dbContext)
+                onComplete(response)
+            } catch (e: Exception) {
+                onComplete("AI explanation မရနိုင်ပါ။ Offline forecast ကို ဆက်လက်အသုံးပြုပါ။ (${e.message ?: "network error"})")
+            }
+        }
+    }
+
     fun executeAiAction(action: AiAction) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
