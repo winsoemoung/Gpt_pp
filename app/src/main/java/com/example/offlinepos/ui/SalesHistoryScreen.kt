@@ -158,6 +158,7 @@ fun SalesHistoryScreen(
 
     val filteredSales = allSales.filter { it.createdAtEpochMs in rangeStart..rangeEnd }
     val filteredPurchases = purchases.filter { it.createdAtEpochMs in rangeStart..rangeEnd }
+    val filteredSaleItems = allSaleItems.filter { item -> filteredSales.any { it.saleId == item.saleId } }
 
     val grossRevenue = filteredSales.sumOf { it.totalMinor }
     val returnedRevenue = allReturnTransactions
@@ -167,15 +168,12 @@ fun SalesHistoryScreen(
     val totalOrders = filteredSales.count { it.status != com.example.offlinepos.data.local.SaleStatus.REFUNDED }
     val averageTicket = if (totalOrders > 0) totalRevenue / totalOrders else 0L
 
-    // Estimated Cost and Profit
-    // Estimated cost is approx 75-80% based on products catalog margin
-    val avgCostRate = if (allProducts.isNotEmpty()) {
-        val totalCost = allProducts.sumOf { it.costPriceMinor }
-        val totalSell = allProducts.sumOf { it.sellPriceMinor }
-        if (totalSell > 0) totalCost.toDouble() / totalSell.toDouble() else 0.8
-    } else 0.8
-
-    val estimatedCostOfGoods = (totalRevenue * avgCostRate).toLong()
+    // Exact COGS from sale-line snapshots and current catalog cost prices.
+    val costByProduct = allProducts.associateBy { it.productId }
+    val estimatedCostOfGoods = filteredSaleItems.sumOf { item ->
+        val netQuantity = (item.quantity - item.returnedQuantity).coerceAtLeast(0L)
+        netQuantity * (costByProduct[item.productId]?.costPriceMinor ?: 0L)
+    }
     val grossProfit = (totalRevenue - estimatedCostOfGoods).coerceAtLeast(0L)
     val profitMarginPercent = if (totalRevenue > 0) (grossProfit.toDouble() / totalRevenue.toDouble()) * 100.0 else 0.0
 
@@ -363,8 +361,8 @@ fun SalesHistoryScreen(
                                 Text("ငွေပေးချေမှုပုံစံ အလိုက် ဝင်ငွေခွဲခြမ်းစိတ်ဖြာချက်:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                val cashRev = filteredSales.filter { it.paymentMethod.equals("CASH", ignoreCase = true) }.sumOf { it.totalMinor }
-                                val digitalRev = filteredSales.filter { it.paymentMethod.contains("KPAY", ignoreCase = true) || it.paymentMethod.contains("WAVEPAY", ignoreCase = true) }.sumOf { it.totalMinor }
+                                val cashRev = filteredSales.filter { it.paymentMethod.equals("CASH", ignoreCase = true) }.sumOf { it.totalMinor } - allReturnTransactions.filter { it.refundMethod.equals("CASH", true) && filteredSales.any { sale -> sale.saleId == it.saleId } }.sumOf { it.returnedAmountMinor }
+                                val digitalRev = filteredSales.filter { it.paymentMethod.contains("KPAY", ignoreCase = true) || it.paymentMethod.contains("WAVEPAY", ignoreCase = true) }.sumOf { it.totalMinor } - allReturnTransactions.filter { (it.refundMethod.contains("KPAY", true) || it.refundMethod.contains("WAVE", true)) && filteredSales.any { sale -> sale.saleId == it.saleId } }.sumOf { it.returnedAmountMinor }
                                 val creditRev = filteredSales.filter { it.paymentMethod.contains("CREDIT", ignoreCase = true) }.sumOf { it.totalMinor }
 
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -406,6 +404,26 @@ fun SalesHistoryScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
+                        val supplierTotals = filteredPurchases.groupBy { it.supplierName.ifBlank { "မသတ်မှတ်ရသေး" } }
+                            .mapValues { (_, rows) -> rows.sumOf { it.totalCostMinor } }
+                        if (supplierTotals.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
+                                shape = RoundedCornerShape(10.dp),
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text("ပေးသွင်းသူအလိုက် စုစုပေါင်း", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    supplierTotals.entries.sortedByDescending { it.value }.take(5).forEach { (supplier, total) ->
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text(supplier, fontSize = 11.sp)
+                                            Text("%,d Ks".format(total), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
 
                         if (filteredPurchases.isEmpty()) {
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {

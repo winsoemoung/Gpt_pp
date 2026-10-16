@@ -57,6 +57,7 @@ class LocalPosServer(
     private val onGetProducts: suspend () -> List<ProductEntity>,
     private val onGetCategories: suspend () -> List<String>,
     private val getStoreName: () -> String,
+    private val onSyncReceived: suspend (String, String) -> Boolean = { _, _ -> true },
 ) {
     private val tag = "LocalPosServer"
     private var serverSocket: ServerSocket? = null
@@ -67,6 +68,7 @@ class LocalPosServer(
         private set
 
     val receivedLogs = mutableListOf<ReceivedProductLog>()
+    private val acknowledgedOperationIds = Collections.synchronizedSet(mutableSetOf<String>())
 
     fun start(): Boolean {
         if (isRunning && serverSocket != null && !serverSocket!!.isClosed) return true
@@ -221,6 +223,24 @@ class LocalPosServer(
                         put("timestamp", System.currentTimeMillis())
                     }
                     sendResponse(output, 200, "application/json", json.toString())
+                }
+
+                // Idempotent offline outbox operation endpoint
+                path == "/api/sync" && method == "POST" -> {
+                    try {
+                        val request = JSONObject(body)
+                        val operationId = request.optString("operationId")
+                        val payload = request.optString("payloadJson")
+                        if (operationId.isBlank() || payload.isBlank()) {
+                            sendResponse(output, 400, "application/json", JSONObject().put("success", false).put("message", "Invalid sync payload").toString())
+                        } else {
+                            val firstSeen = acknowledgedOperationIds.add(operationId)
+                            val accepted = if (firstSeen) onSyncReceived(operationId, payload) else true
+                            sendResponse(output, if (accepted) 200 else 409, "application/json", JSONObject().put("success", accepted).put("acknowledged", true).put("operationId", operationId).toString())
+                        }
+                    } catch (e: Exception) {
+                        sendResponse(output, 400, "application/json", JSONObject().put("success", false).put("message", e.message ?: "Invalid JSON").toString())
+                    }
                 }
 
                 // Get Categories API

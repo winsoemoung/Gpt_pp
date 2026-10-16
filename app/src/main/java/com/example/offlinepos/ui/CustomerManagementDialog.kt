@@ -247,8 +247,11 @@ fun CustomerManagementDialog(
     if (showAddDialog) {
         AddCustomerDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, phone, address, creditLimit ->
-                viewModel.createCustomer(name, phone, address, creditLimit) { success, msg ->
+            onConfirm = { name, phone, address, creditLimit, dueDate ->
+                val dueDateEpoch = dueDate.takeIf { it.isNotBlank() }?.let {
+                    runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it)?.time }.getOrNull()
+                }
+                viewModel.createCustomer(name, phone, address, creditLimit, dueDateEpoch) { success, msg ->
                     viewModel.setBanner(msg)
                     if (success) showAddDialog = false
                 }
@@ -330,6 +333,12 @@ private fun CustomerListItem(
                             )
                         }
                     }
+                    if (customer.currentDebtMinor > 0 && customer.creditDueDateEpochMs != null && customer.creditDueDateEpochMs < System.currentTimeMillis()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFFFEDD5)) {
+                            Text("ရက်ကျော်", fontSize = 10.sp, color = Color(0xFFC2410C), fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -393,12 +402,13 @@ private fun CustomerListItem(
 @Composable
 private fun AddCustomerDialog(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, phone: String, address: String, creditLimit: Long) -> Unit,
+    onConfirm: (name: String, phone: String, address: String, creditLimit: Long, dueDate: String) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var creditLimitText by remember { mutableStateOf("") }
+    var dueDateText by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -451,6 +461,15 @@ private fun AddCustomerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = dueDateText,
+                    onValueChange = { dueDateText = it.take(10) },
+                    label = { Text("အကြွေးပေးရမည့်ရက် (YYYY-MM-DD)") },
+                    placeholder = { Text("ဥပမာ: 2026-11-30") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -464,7 +483,7 @@ private fun AddCustomerDialog(
                         onClick = {
                             if (name.isNotBlank()) {
                                 val limit = creditLimitText.toLongOrNull() ?: 0L
-                                onConfirm(name.trim(), phone.trim(), address.trim(), limit)
+                                onConfirm(name.trim(), phone.trim(), address.trim(), limit, dueDateText.trim())
                             }
                         },
                         enabled = name.isNotBlank()

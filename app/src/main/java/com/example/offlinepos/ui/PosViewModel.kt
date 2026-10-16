@@ -9,11 +9,15 @@ import androidx.core.content.FileProvider
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.offlinepos.Repository.Actor
 import com.example.offlinepos.Repository.CheckoutRepository
 import com.example.offlinepos.Repository.CheckoutResult
 import com.example.offlinepos.Repository.PaymentRequest
 import com.example.offlinepos.Sync.BackupManager
+import com.example.offlinepos.Sync.SyncWorker
 import com.example.offlinepos.ai.AiAction
 import com.example.offlinepos.ai.AiActionType
 import com.example.offlinepos.ai.AiChatMessage
@@ -1045,6 +1049,14 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
             when (val result = checkoutRepo.checkout(cartItems, paymentRequest, _actor.value)) {
                 is CheckoutResult.Committed -> {
+                    WorkManager.getInstance(context).enqueueUniqueWork(
+                        "offlinepos-outbox-sync",
+                        ExistingWorkPolicy.KEEP,
+                        OneTimeWorkRequestBuilder<SyncWorker>()
+                            .setConstraints(SyncWorker.constraints())
+                            .setBackoffCriteria(SyncWorker.backoffPolicy, java.time.Duration.ofSeconds(30))
+                            .build(),
+                    )
                     val items = cartItems.map { item ->
                         SaleItemEntity(
                             saleId = result.saleId,
@@ -1164,7 +1176,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
     }
 
     // Customer CRM & Debt
-    fun createCustomer(name: String, phone: String, address: String, creditLimit: Long, onResult: (Boolean, String) -> Unit) {
+    fun createCustomer(name: String, phone: String, address: String, creditLimit: Long, dueDateEpochMs: Long? = null, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val customer = CustomerEntity(
@@ -1173,6 +1185,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     address = address,
                     creditLimitMinor = creditLimit,
                     currentDebtMinor = 0L,
+                    creditDueDateEpochMs = dueDateEpochMs,
                     createdAtEpochMs = System.currentTimeMillis()
                 )
                 db.customerDao().insertCustomer(customer)
@@ -1215,6 +1228,56 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 withContext(Dispatchers.Main) {
                     onResult(false, "ဖျက်ပစ်ခြင်း မအောင်မြင်ပါ: ${e.message}")
                 }
+            }
+        }
+    }
+
+    fun exportProductsCsv(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val csv = buildString {
+                    append(ProductCsv.HEADER).append('\n')
+                    allProducts.value.forEach { append(ProductCsv.encode(it)).append('\n') }
+                }
+                context.contentResolver.openOutputStream(uri)?.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                withContext(Dispatchers.Main) { setBanner("Product CSV export ပြီးပါပြီ") }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { setBanner("CSV export မအောင်မြင်ပါ: ${e.message}") }
+            }
+        }
+    }
+
+    fun importProductsCsv(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val text = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    ?: error("ဖိုင်ဖတ်၍ မရပါ")
+                var imported = 0
+                text.lineSequence().drop(1).filter { it.isNotBlank() }.forEach { line ->
+                    val cols = ProductCsv.parseRow(line)
+                    if (cols.size < 10) return@forEach
+                    val sku = cols[1].trim()
+                    if (sku.isBlank()) return@forEach
+                    val now = System.currentTimeMillis()
+                    val existing = db.productDao().findBySku(sku)
+                    val product = ProductEntity(
+                        productId = existing?.productId ?: 0L,
+                        name = cols[0].trim(), sku = sku, barcode = cols[2].trim().ifBlank { null },
+                        category = cols[3].trim().ifBlank { "အထွေထွေ" },
+                        costPriceMinor = cols[4].toLongOrNull() ?: 0L,
+                        sellPriceMinor = cols[5].toLongOrNull() ?: 0L,
+                        stockQuantity = cols[6].toLongOrNull() ?: 0L,
+                        lowStockThreshold = cols[7].toLongOrNull() ?: 3L,
+                        unitName = cols[8].trim().ifBlank { "ခု" },
+                        isActive = cols[9].toBooleanStrictOrNull() ?: true,
+                        updatedAtEpochMs = now,
+                    )
+                    if (existing == null) db.productDao().insert(product) else db.productDao().update(product)
+                    imported++
+                }
+                withContext(Dispatchers.Main) { setBanner("Product CSV import ပြီးပါပြီ ($imported ခု)") }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { setBanner("CSV import မအောင်မြင်ပါ: ${e.message}") }
             }
         }
     }

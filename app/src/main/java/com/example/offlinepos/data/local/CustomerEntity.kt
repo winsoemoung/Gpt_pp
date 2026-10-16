@@ -11,6 +11,7 @@ data class CustomerEntity(
     val address: String = "",
     val creditLimitMinor: Long = 0L, // 0 = no credit limit set
     val currentDebtMinor: Long = 0L,
+    val creditDueDateEpochMs: Long? = null,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
     val notes: String = "",
 )

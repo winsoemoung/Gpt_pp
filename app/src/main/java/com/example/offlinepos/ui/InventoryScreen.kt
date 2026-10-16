@@ -30,6 +30,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -92,6 +94,8 @@ fun InventoryScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var productToDelete by remember { mutableStateOf<ProductEntity?>(null) }
     var recentSearches by remember { mutableStateOf(RecentSearchHelper.getRecentSearches(context)) }
+    val exportCsvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri -> uri?.let(viewModel::exportProductsCsv) }
+    val importCsvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(viewModel::importProductsCsv) }
 
     val filteredList = products.filter {
         val matchesSearch = searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) || it.sku.contains(searchQuery, ignoreCase = true)
@@ -113,6 +117,12 @@ fun InventoryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp),
                     ) {
+                        IconButton(onClick = { importCsvLauncher.launch(arrayOf("text/csv", "text/plain")) }) {
+                            Icon(Icons.Default.FileUpload, contentDescription = "Import CSV")
+                        }
+                        IconButton(onClick = { exportCsvLauncher.launch("products.csv") }) {
+                            Icon(Icons.Default.FileDownload, contentDescription = "Export CSV")
+                        }
                         StoreLogoAvatar(
                             customLogoPath = storeProfile.customLogoPath,
                             contentDescription = "Inventory Manager",

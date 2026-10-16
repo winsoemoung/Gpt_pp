@@ -2,6 +2,7 @@ package com.example.offlinepos.Repository
 
 import com.example.offlinepos.data.local.*
 import com.example.offlinepos.domain.*
+import org.json.JSONObject
 data class Actor(val userId: String, val canApplyDiscount: Boolean)
 data class PaymentRequest(
     val method: String,
@@ -93,6 +94,34 @@ class CheckoutRepository(
         )
         return try {
             db.checkoutDao().commitSale(sale, lines, paymentRow, audit, timestamp)
+            val operationId = newId()
+            db.outboxDao().enqueue(
+                OutboxEntity(
+                    operationId = operationId,
+                    idempotencyKey = operationId,
+                    aggregateType = "SALE",
+                    aggregateId = saleId,
+                    payloadJson = JSONObject().apply {
+                        put("saleId", saleId)
+                        put("totalMinor", totals.totalMinor)
+                        put("paymentMethod", payment.method)
+                        put("createdAtEpochMs", timestamp)
+                        put("items", lines.size)
+                    }.toString(),
+                    schemaVersion = 1,
+                    aggregateVersion = timestamp,
+                    actorId = actor.userId,
+                    deviceId = deviceId,
+                    state = SyncState.PENDING,
+                    errorClass = null,
+                    lastError = null,
+                    retryCount = 0,
+                    nextAttemptAtEpochMs = timestamp,
+                    reconciliationResult = null,
+                    createdAtEpochMs = timestamp,
+                    updatedAtEpochMs = timestamp,
+                )
+            )
             CheckoutResult.Committed(saleId, paymentRow.changeMinor)
         } catch (e: IllegalStateException) {
             CheckoutResult.Rejected(e.message ?: "Checkout failed")

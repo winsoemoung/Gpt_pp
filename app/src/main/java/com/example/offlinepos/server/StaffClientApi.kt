@@ -30,6 +30,28 @@ data class RemoteProductItem(
 
 object StaffClientApi {
 
+    suspend fun pushOutboxOperation(baseUrl: String, operationId: String, payloadJson: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(baseUrl.trimEnd('/') + "/api/sync")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 5000
+                readTimeout = 5000
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+                doOutput = true
+            }
+            val body = JSONObject().put("operationId", operationId).put("payloadJson", payloadJson).toString().toByteArray(Charsets.UTF_8)
+            conn.outputStream.use { it.write(body) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val response = stream?.bufferedReader()?.use { it.readText() } ?: ""
+            if (code in 200..299) Result.success(response) else Result.failure(Exception("Sync error: $code $response"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun testConnection(baseUrl: String): Result<ServerStatusInfo> = withContext(Dispatchers.IO) {
         try {
             val cleanUrl = baseUrl.trimEnd('/') + "/api/status"

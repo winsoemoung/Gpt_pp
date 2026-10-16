@@ -68,6 +68,24 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Added Room migration 6→7 and corrected the migration test to match the actual schema.
 - Updated legacy launcher PNG icons to use the supplied store image.
 
+## New5 operations and reporting update
+
+- Registered `sync_outbox` in Room with migration 8→9.
+- Checkout now enqueues idempotent SALE operations; WorkManager retries delivery to the local `/api/sync` endpoint.
+- Added idempotent local server sync acknowledgement and retry state tracking.
+- Added UTF-8 CSV product export/import from Inventory, including price and stock bulk updates by SKU.
+- Added customer credit due-date entry and overdue badges.
+- Improved reports with exact product-cost COGS, return-aware payment settlement, and supplier purchase summaries.
+- Added CSV upload/download actions to the Inventory top bar.
+- Version 5.0.0 / versionCode 7.
+
+### Known scope not included in New5
+
+- Supplier debt/payment ledger is not yet a separate accounting module; purchase supplier totals and invoice references are available.
+- Barcode label printing and Excel `.xlsx` support are not included; CSV is supported.
+- Product-level profit and exportable PDF/CSV report files are not yet a dedicated report-export workflow.
+- Remote multi-device sync beyond the local POS server still needs a persistent server-side database and authentication contract.
+
 ## Requirements
 
 - Android Studio with Android SDK 36

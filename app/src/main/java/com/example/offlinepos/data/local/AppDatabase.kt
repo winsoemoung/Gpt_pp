@@ -19,8 +19,9 @@ import androidx.room.RoomDatabase
         ParkedOrderEntity::class,
         StockMovementEntity::class,
         ReturnTransactionEntity::class,
+        OutboxEntity::class,
     ],
-    version = 7,
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun checkoutDao(): CheckoutDao
     abstract fun customerDao(): CustomerDao
     abstract fun operationsDao(): OperationsDao
+    abstract fun outboxDao(): OutboxDao
 
     companion object {
         private const val DB_NAME = "offline_pos.db"
@@ -40,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DB_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .build().also { INSTANCE = it }
             }
 
