@@ -123,6 +123,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
     // All Sale Items Flow (For In-Depth Product & Periodic Reorder Analytics)
     val allSaleItems: StateFlow<List<SaleItemEntity>> = db.checkoutDao().observeAllSaleItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allReturnTransactions = db.checkoutDao().observeAllReturnTransactions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Audit Events Flow
     val auditEvents: StateFlow<List<AuditEventEntity>> = db.checkoutDao().observeAuditEvents()
@@ -1431,6 +1433,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 customerName = sale.customerName,
                 splitCashMinor = sale.splitCashMinor,
                 splitDigitalMinor = sale.splitDigitalMinor,
+                saleStatus = sale.status,
             )
             _receipt.value = receiptData
         }
@@ -1517,7 +1520,14 @@ class PosViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    fun refundSaleItems(saleId: String, quantitiesByLineId: Map<Long, Long>, onComplete: (Boolean, String) -> Unit) {
+    fun refundSaleItems(
+        saleId: String,
+        quantitiesByLineId: Map<Long, Long>,
+        refundMethod: String = "CASH",
+        refundReference: String? = null,
+        reason: String? = null,
+        onComplete: (Boolean, String) -> Unit,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val success = db.checkoutDao().refundSaleItems(
@@ -1525,6 +1535,9 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     requestedReturns = quantitiesByLineId,
                     now = System.currentTimeMillis(),
                     actorId = _actor.value.userId,
+                    refundMethod = refundMethod,
+                    refundReference = refundReference,
+                    reason = reason,
                 )
                 withContext(Dispatchers.Main) {
                     onComplete(

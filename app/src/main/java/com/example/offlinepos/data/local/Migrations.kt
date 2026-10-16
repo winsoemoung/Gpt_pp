@@ -42,10 +42,26 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("ALTER TABLE sale_items ADD COLUMN returnedQuantity INTEGER NOT NULL DEFAULT 0")
     }
 }
-
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS return_transactions (
+            returnId TEXT NOT NULL PRIMARY KEY,
+            saleId TEXT NOT NULL,
+            returnedAmountMinor INTEGER NOT NULL,
+            refundMethod TEXT NOT NULL,
+            refundReference TEXT,
+            reason TEXT,
+            actorId TEXT NOT NULL,
+            createdAtEpochMs INTEGER NOT NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_return_transactions_saleId ON return_transactions(saleId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_return_transactions_createdAtEpochMs ON return_transactions(createdAtEpochMs)")
+    }
+}
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
     MIGRATION_3_4,
     MIGRATION_4_5,
     MIGRATION_5_6,
+    MIGRATION_6_7,
 )

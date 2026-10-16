@@ -18,6 +18,9 @@ abstract class CheckoutDao {
     @Query("SELECT * FROM sale_items")
     abstract fun observeAllSaleItems(): Flow<List<SaleItemEntity>>
 
+    @Query("SELECT * FROM return_transactions ORDER BY createdAtEpochMs DESC")
+    abstract fun observeAllReturnTransactions(): Flow<List<ReturnTransactionEntity>>
+
     @Query("SELECT status FROM sales WHERE saleId = :saleId LIMIT 1")
     abstract suspend fun getSaleStatus(saleId: String): String?
 
@@ -38,6 +41,15 @@ abstract class CheckoutDao {
 
     @Insert
     abstract suspend fun insertAudit(event: AuditEventEntity)
+
+    @Insert
+    abstract suspend fun insertReturnTransaction(transaction: ReturnTransactionEntity)
+
+    @Insert
+    abstract suspend fun insertStockMovement(movement: StockMovementEntity)
+
+    @Query("SELECT stockQuantity FROM products WHERE productId = :productId LIMIT 1")
+    abstract suspend fun getProductStock(productId: Long): Long?
 
     @Query("""
         UPDATE products SET stockQuantity = stockQuantity - :qty, updatedAtEpochMs = :now
@@ -80,6 +92,9 @@ abstract class CheckoutDao {
         requestedReturns: Map<Long, Long>,
         now: Long,
         actorId: String,
+        refundMethod: String = "CASH",
+        refundReference: String? = null,
+        reason: String? = null,
     ): Boolean {
         if (requestedReturns.isEmpty()) return false
         val status = getSaleStatus(saleId) ?: return false
@@ -94,10 +109,28 @@ abstract class CheckoutDao {
             check(requestedQty <= line.quantity - line.returnedQuantity) { "Return quantity exceeds remaining quantity" }
         }
 
+        var returnedAmountMinor = 0L
         cleanReturns.forEach { (lineId, requestedQty) ->
             val line = byLineId.getValue(lineId)
+            val stockBefore = getProductStock(line.productId) ?: error("Product not found")
             check(addReturnedQuantity(lineId, requestedQty) == 1) { "Could not update returned quantity" }
             check(restoreStock(line.productId, requestedQty, now) == 1) { "Product not found" }
+            val stockAfter = stockBefore + requestedQty
+            insertStockMovement(
+                StockMovementEntity(
+                    movementId = UUID.randomUUID().toString(),
+                    productId = line.productId,
+                    movementType = "SALE_RETURN",
+                    quantityChange = requestedQty,
+                    quantityBefore = stockBefore,
+                    quantityAfter = stockAfter,
+                    referenceId = saleId,
+                    reason = reason ?: "Partial product return",
+                    actorId = actorId,
+                    createdAtEpochMs = now,
+                )
+            )
+            returnedAmountMinor += line.unitPriceMinor * requestedQty
         }
 
         val finalItems = getItemsForSale(saleId)
@@ -105,6 +138,18 @@ abstract class CheckoutDao {
         val nextStatus = if (fullyReturned) SaleStatus.REFUNDED else SaleStatus.PARTIALLY_REFUNDED
         check(updateReturnSaleStatus(saleId, nextStatus) == 1) { "Sale status could not be updated" }
         val totalReturned = cleanReturns.values.sum()
+        insertReturnTransaction(
+            ReturnTransactionEntity(
+                returnId = UUID.randomUUID().toString(),
+                saleId = saleId,
+                returnedAmountMinor = returnedAmountMinor,
+                refundMethod = refundMethod,
+                refundReference = refundReference,
+                reason = reason ?: if (fullyReturned) "Full sale return" else "Partial product return",
+                actorId = actorId,
+                createdAtEpochMs = now,
+            )
+        )
         insertAudit(
             AuditEventEntity(
                 eventId = UUID.randomUUID().toString(),
@@ -122,12 +167,19 @@ abstract class CheckoutDao {
     }
 
     @Transaction
-    open suspend fun refundSale(saleId: String, now: Long, actorId: String): Boolean {
+    open suspend fun refundSale(
+        saleId: String,
+        now: Long,
+        actorId: String,
+        refundMethod: String = "CASH",
+        refundReference: String? = null,
+        reason: String? = null,
+    ): Boolean {
         val status = getSaleStatus(saleId) ?: return false
         if (status != SaleStatus.COMPLETED && status != SaleStatus.PARTIALLY_REFUNDED) return false
         val remaining = getItemsForSale(saleId)
             .filter { it.quantity > it.returnedQuantity }
             .associate { it.lineId to (it.quantity - it.returnedQuantity) }
-        return refundSaleItems(saleId, remaining, now, actorId)
+        return refundSaleItems(saleId, remaining, now, actorId, refundMethod, refundReference, reason)
     }
 }

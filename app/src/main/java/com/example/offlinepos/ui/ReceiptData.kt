@@ -17,6 +17,7 @@ data class ReceiptData(
     val customerName: String? = null,
     val splitCashMinor: Long = 0L,
     val splitDigitalMinor: Long = 0L,
+    val saleStatus: String = "COMPLETED",
 ) {
     val subtotalMinor: Long get() = totals.subtotalMinor
     val discountMinor: Long get() = totals.discountMinor

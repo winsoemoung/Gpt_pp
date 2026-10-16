@@ -106,6 +106,7 @@ fun SalesHistoryScreen(
     val allSales by viewModel.salesHistory.collectAsState()
     val allProducts by viewModel.allProducts.collectAsState()
     val allSaleItems by viewModel.allSaleItems.collectAsState()
+    val allReturnTransactions by viewModel.allReturnTransactions.collectAsState()
     val storeProfile by viewModel.storeProfile.collectAsState()
     val purchases by viewModel.purchases.collectAsState()
     val shifts by viewModel.shifts.collectAsState()
@@ -158,8 +159,12 @@ fun SalesHistoryScreen(
     val filteredSales = allSales.filter { it.createdAtEpochMs in rangeStart..rangeEnd }
     val filteredPurchases = purchases.filter { it.createdAtEpochMs in rangeStart..rangeEnd }
 
-    val totalRevenue = filteredSales.sumOf { it.totalMinor }
-    val totalOrders = filteredSales.size
+    val grossRevenue = filteredSales.sumOf { it.totalMinor }
+    val returnedRevenue = allReturnTransactions
+        .filter { transaction -> filteredSales.any { it.saleId == transaction.saleId } }
+        .sumOf { it.returnedAmountMinor }
+    val totalRevenue = (grossRevenue - returnedRevenue).coerceAtLeast(0L)
+    val totalOrders = filteredSales.count { it.status != com.example.offlinepos.data.local.SaleStatus.REFUNDED }
     val averageTicket = if (totalOrders > 0) totalRevenue / totalOrders else 0L
 
     // Estimated Cost and Profit
@@ -253,8 +258,9 @@ fun SalesHistoryScreen(
                             shape = RoundedCornerShape(12.dp),
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("စုစုပေါင်း အရောင်းရငွေ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text("Net အရောင်းရငွေ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 Text("%,d Ks".format(totalRevenue), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                if (returnedRevenue > 0) Text("Return -%,d Ks".format(returnedRevenue), fontSize = 10.sp, color = Color(0xFFB91C1C))
                             }
                         }
                         Card(
@@ -528,8 +534,8 @@ fun SalesHistoryScreen(
             sale = sale,
             items = allSaleItems.filter { it.saleId == sale.saleId },
             onDismiss = { saleToRefund = null },
-            onConfirm = { quantities ->
-                viewModel.refundSaleItems(sale.saleId, quantities) { _, message -> viewModel.setBanner(message) }
+            onConfirm = { quantities, method, reference, reason ->
+                viewModel.refundSaleItems(sale.saleId, quantities, method, reference, reason) { _, message -> viewModel.setBanner(message) }
                 saleToRefund = null
             },
         )
@@ -634,11 +640,14 @@ private fun PartialReturnDialog(
     sale: SaleEntity,
     items: List<SaleItemEntity>,
     onDismiss: () -> Unit,
-    onConfirm: (Map<Long, Long>) -> Unit,
+    onConfirm: (Map<Long, Long>, String, String?, String?) -> Unit,
 ) {
     var quantities by remember(items) {
         mutableStateOf(items.associate { it.lineId to "0" })
     }
+    var refundMethod by remember { mutableStateOf("CASH") }
+    var refundReference by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
     val returnableItems = items.filter { it.quantity > it.returnedQuantity }
     val selected = quantities.mapNotNull { (lineId, text) ->
         text.toLongOrNull()?.takeIf { it > 0L }?.let { lineId to it }
@@ -687,10 +696,32 @@ private fun PartialReturnDialog(
                     ) { Text("ကျန်ရှိသမျှအားလုံး ပြန်အပ်မည် (Full Return)") }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = refundMethod,
+                    onValueChange = { refundMethod = it.uppercase().take(20) },
+                    label = { Text("Refund method (CASH/KPAY/WAVEPAY)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = refundReference,
+                    onValueChange = { refundReference = it.take(80) },
+                    label = { Text("Refund reference (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it.take(160) },
+                    label = { Text("Return reason (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("မလုပ်တော့ပါ") }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { onConfirm(selected) }, enabled = selected.isNotEmpty()) { Text("Return အတည်ပြုမည်") }
+                    Button(onClick = { onConfirm(selected, refundMethod.ifBlank { "CASH" }, refundReference.ifBlank { null }, reason.ifBlank { null }) }, enabled = selected.isNotEmpty()) { Text("Return အတည်ပြုမည်") }
                 }
             }
         }

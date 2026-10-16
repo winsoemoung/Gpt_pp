@@ -70,4 +70,46 @@ class CheckoutRollbackTest {
         assertEquals(true, threw)
         assertEquals(1L, db.productDao().findById(productId)?.stockQuantity)
     }
+
+    @Test
+    fun partialReturn_restoresOnlyRequestedQuantityAndRecordsLedger() = runTest {
+        val productId = db.productDao().insert(
+            ProductEntity(
+                name = "Cement", sku = "CEM-1", barcode = "9876543210123",
+                costPriceMinor = 20_000, sellPriceMinor = 25_000, stockQuantity = 20,
+                updatedAtEpochMs = 1,
+            ),
+        )
+        val sale = SaleEntity(
+            saleId = "s2", businessDate = "2026-10-17", subtotalMinor = 75_000,
+            discountMinor = 0, taxMinor = 0, totalMinor = 75_000,
+            status = SaleStatus.COMPLETED, cashierId = "u1", deviceId = "d1", createdAtEpochMs = 1,
+        )
+        val line = SaleItemEntity(
+            saleId = "s2", productId = productId, productNameSnapshot = "Cement",
+            unitPriceMinor = 25_000, quantity = 3, lineDiscountMinor = 0,
+            lineTaxMinor = 0, lineTotalMinor = 75_000,
+        )
+        val payment = PaymentEntity(
+            paymentId = "p2", saleId = "s2", method = "CASH", tenderedMinor = 75_000,
+            changeMinor = 0, authorizedMinor = 75_000, authorizationState = "NOT_REQUIRED",
+            providerReference = null, settlementState = "NOT_APPLICABLE", manualRecorded = false,
+            recordedByUserId = "u1", createdAtEpochMs = 1,
+        )
+        val audit = AuditEventEntity(
+            eventId = "a2", actorId = "u1", action = "SALE_COMPLETED",
+            aggregateType = "SALE", aggregateId = "s2", reason = null,
+            approverId = null, createdAtEpochMs = 1, payloadHash = "x",
+        )
+        db.checkoutDao().commitSale(sale, listOf(line), payment, audit, 1)
+        val lineId = db.checkoutDao().getItemsForSale("s2").single().lineId
+
+        assertEquals(true, db.checkoutDao().refundSaleItems(
+            saleId = "s2", requestedReturns = mapOf(lineId to 1L), now = 2,
+            actorId = "u1", refundMethod = "KPAY", refundReference = "K-1",
+        ))
+        assertEquals(18L, db.productDao().findById(productId)?.stockQuantity)
+        assertEquals(1L, db.checkoutDao().getItemsForSale("s2").single().returnedQuantity)
+        assertEquals(SaleStatus.PARTIALLY_REFUNDED, db.checkoutDao().getSaleStatus("s2"))
+    }
 }

@@ -99,6 +99,14 @@ object PdfReceiptHelper {
         paint.textSize = 11f
         canvas.drawText("ပြေစာအမှတ်: ${receipt.saleId.take(16)}", 30f, y, paint)
         y += 18f
+        if (receipt.saleStatus != "COMPLETED") {
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.color = Color.rgb(180, 0, 0)
+            canvas.drawText("အခြေအနေ: ${receipt.saleStatus}", 30f, y, paint)
+            paint.color = Color.BLACK
+            paint.typeface = Typeface.DEFAULT
+            y += 18f
+        }
         canvas.drawText("ရက်စွဲ: ${receipt.businessDate}", 30f, y, paint)
         y += 18f
         canvas.drawText("ငွေကိုင်: ${receipt.cashierId}", 30f, y, paint)

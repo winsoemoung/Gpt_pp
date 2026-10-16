@@ -17,7 +17,7 @@ class MigrationTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun migrate1To2_addsTaxCodeColumnAndKeepsExistingSales() {
+    fun migrate1To2_addsCategoryColumnAndKeepsExistingSales() {
         val dbFile = File(context.cacheDir, "migration-test.db")
         if (dbFile.exists()) dbFile.delete()
 
@@ -77,17 +77,17 @@ class MigrationTest {
             assertEquals(1, cursor.getInt(0))
         }
 
-        // Validate taxCode column exists
+        // Validate the current category column exists
         db.query("PRAGMA table_info(products)").use { cursor ->
-            var foundTaxCode = false
+            var foundCategory = false
             while (cursor.moveToNext()) {
                 val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
-                if (name == "taxCode") {
-                    foundTaxCode = true
+                if (name == "category") {
+                    foundCategory = true
                     break
                 }
             }
-            assertTrue("taxCode column should exist in products table", foundTaxCode)
+            assertTrue("category column should exist in products table", foundCategory)
         }
 
         db.close()

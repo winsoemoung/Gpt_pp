@@ -59,6 +59,15 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Return operations restore stock atomically and write an audit event for partial or full returns.
 - Version 4.0.0 / versionCode 5.
 
+## New4-2 accounting and reliability update
+
+- Added return transaction records with refund amount, method, reference, reason, actor, and timestamp.
+- Return operations now write `SALE_RETURN` stock movement ledger entries atomically.
+- Sales History now shows net revenue after returned amounts.
+- Partial/full return metadata is shown on reprinted PDF receipts.
+- Added Room migration 6→7 and corrected the migration test to match the actual schema.
+- Updated legacy launcher PNG icons to use the supplied store image.
+
 ## Requirements
 
 - Android Studio with Android SDK 36
