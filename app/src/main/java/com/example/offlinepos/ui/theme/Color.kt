@@ -2,22 +2,22 @@ package com.example.offlinepos.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val PosPrimary = Color(0xFF0D9488) // Modern Teal
+val PosPrimary = Color(0xFFE38B16) // Safety amber
 val PosOnPrimary = Color(0xFFFFFFFF)
-val PosPrimaryContainer = Color(0xFFCCFBF1)
-val PosOnPrimaryContainer = Color(0xFF115E59)
+val PosPrimaryContainer = Color(0xFFFFE8B2)
+val PosOnPrimaryContainer = Color(0xFF5A3900)
 
-val PosSecondary = Color(0xFF0284C7) // Sky blue
+val PosSecondary = Color(0xFF64748B) // Slate grey
 val PosOnSecondary = Color(0xFFFFFFFF)
-val PosSecondaryContainer = Color(0xFFE0F2FE)
-val PosOnSecondaryContainer = Color(0xFF0369A1)
+val PosSecondaryContainer = Color(0xFFE2E8F0)
+val PosOnSecondaryContainer = Color(0xFF273449)
 
-val PosTertiary = Color(0xFFD97706) // Amber accent
+val PosTertiary = Color(0xFFB45309) // Deep amber accent
 val PosOnTertiary = Color(0xFFFFFFFF)
 val PosTertiaryContainer = Color(0xFFFEF3C7)
 val PosOnTertiaryContainer = Color(0xFF92400E)
 
-val PosBackground = Color(0xFFF8FAFC)
+val PosBackground = Color(0xFFF5F6F8)
 val PosSurface = Color(0xFFFFFFFF)
 val PosSurfaceVariant = Color(0xFFF1F5F9)
 val PosOnSurface = Color(0xFF0F172A)
@@ -25,13 +25,13 @@ val PosOnSurfaceVariant = Color(0xFF475569)
 val PosOutline = Color(0xFFCBD5E1)
 
 // Dark Theme Colors
-val PosPrimaryDark = Color(0xFF2DD4BF)
-val PosOnPrimaryDark = Color(0xFF003833)
-val PosPrimaryContainerDark = Color(0xFF005049)
-val PosOnPrimaryContainerDark = Color(0xFF99F6E4)
+val PosPrimaryDark = Color(0xFFFFB83D)
+val PosOnPrimaryDark = Color(0xFF3D2500)
+val PosPrimaryContainerDark = Color(0xFF6B4700)
+val PosOnPrimaryContainerDark = Color(0xFFFFE8B2)
 
-val PosBackgroundDark = Color(0xFF0F172A)
-val PosSurfaceDark = Color(0xFF1E293B)
+val PosBackgroundDark = Color(0xFF111827)
+val PosSurfaceDark = Color(0xFF1F2937)
 val PosSurfaceVariantDark = Color(0xFF334155)
 val PosOnSurfaceDark = Color(0xFFF8FAFC)
 val PosOnSurfaceVariantDark = Color(0xFF94A3B8)

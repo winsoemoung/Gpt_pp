@@ -16,6 +16,17 @@ Offline-first Android POS application built with Kotlin, Jetpack Compose, Room, 
 - Local POS Server for staff devices over Wi-Fi, including browser camera/gallery image upload
 - Delete confirmations for destructive actions
 
+## Modern UI refresh
+
+The current `main` branch includes a premium industrial-materials visual refresh:
+
+- Slate grey, charcoal, and safety amber branded Material 3 light/dark colors
+- Responsive dashboard KPI cards for daily revenue, customer credit, and low-stock alerts
+- Animated daily revenue counter and elevated metric surfaces
+- Interactive daily/monthly candlestick sales analytics with selectable detail cards
+- Category chips, recent searches, multi-unit product labels, and a modern cart/checkout flow
+- Delivery-fee-aware receipts and Unicode-safe Burmese labels for PDF and Bluetooth output
+
 ## Requirements
 
 - Android Studio with Android SDK 36

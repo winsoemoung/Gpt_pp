@@ -25,16 +25,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,11 +50,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +68,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -99,6 +108,9 @@ fun HomeScreen(
     var showShiftReport by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
     val isServerRunning by viewModel.isServerRunning.collectAsState()
+    val salesHistory by viewModel.salesHistory.collectAsState()
+    val allProducts by viewModel.allProducts.collectAsState()
+    val customers by viewModel.customers.collectAsState()
     val context = LocalContext.current
     var recentSearches by remember { mutableStateOf(RecentSearchHelper.getRecentSearches(context)) }
 
@@ -221,6 +233,13 @@ fun HomeScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 )
+            )
+
+            PremiumDashboard(
+                sales = salesHistory,
+                products = allProducts,
+                customers = customers,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
             // Search Bar & Construction Category Filters
@@ -473,6 +492,86 @@ fun HomeScreen(
                 viewModel.setStaffClientMode(true)
             }
         )
+    }
+}
+
+@Composable
+private fun PremiumDashboard(
+    sales: List<com.example.offlinepos.data.local.SaleEntity>,
+    products: List<ProductEntity>,
+    customers: List<com.example.offlinepos.data.local.CustomerEntity>,
+    modifier: Modifier = Modifier,
+) {
+    val today = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+    val todaySales = sales.filter { it.businessDate == today && it.status == "COMPLETED" }
+    val todayRevenue = todaySales.sumOf { it.totalMinor }
+    val credit = customers.sumOf { it.currentDebtMinor }
+    val lowStock = products.count { it.isActive && it.stockQuantity <= it.lowStockThreshold }
+    val revenueAnimated by animateFloatAsState(todayRevenue.toFloat(), label = "daily_revenue_counter")
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Column {
+                Text("ယနေ့ လုပ်ငန်းအခြေအနေ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                Text("Building Materials POS • Offline ready", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Text("LIVE", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), fontSize = 10.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DashboardMetricCard(
+                title = "ယနေ့အရောင်း", value = "%,d Ks".format(revenueAnimated.toLong()),
+                detail = "${todaySales.size} ဘောင်ချာ", icon = { Icon(Icons.Default.TrendingUp, null) },
+                accent = Color(0xFFB45309), modifier = Modifier.weight(1.2f),
+            )
+            DashboardMetricCard(
+                title = "ဖောက်သည်အကြွေး", value = "%,d Ks".format(credit), detail = "Outstanding credit",
+                icon = { Icon(Icons.Default.AccountBalanceWallet, null) }, accent = Color(0xFF7C3AED), modifier = Modifier.weight(1f),
+            )
+            DashboardMetricCard(
+                title = "လက်ကျန်သတိပေး", value = "$lowStock", detail = "ပစ္စည်းများ",
+                icon = { Icon(Icons.Default.ErrorOutline, null) }, accent = Color(0xFFDC2626), modifier = Modifier.weight(0.82f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardMetricCard(
+    title: String,
+    value: String,
+    detail: String,
+    icon: @Composable () -> Unit,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.18f), Color.Transparent)))
+                .padding(10.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(shape = CircleShape, color = accent.copy(alpha = 0.16f), modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CompositionLocalProvider(LocalContentColor provides accent) { icon() }
+                    }
+                }
+                Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 
