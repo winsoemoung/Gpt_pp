@@ -524,15 +524,14 @@ fun SalesHistoryScreen(
         )
     }
     saleToRefund?.let { sale ->
-        ConfirmDeleteDialog(
-            title = "Return / Refund အတည်ပြုပါ",
-            message = "Sale #${sale.saleId.take(8)} ကို ပြန်အပ်ပြီး stock ပြန်တိုးမည်။ ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။",
-            confirmText = "Return ပြုလုပ်မည်",
-            onConfirm = {
-                viewModel.refundSale(sale.saleId) { _, message -> viewModel.setBanner(message) }
+        PartialReturnDialog(
+            sale = sale,
+            items = allSaleItems.filter { it.saleId == sale.saleId },
+            onDismiss = { saleToRefund = null },
+            onConfirm = { quantities ->
+                viewModel.refundSaleItems(sale.saleId, quantities) { _, message -> viewModel.setBanner(message) }
                 saleToRefund = null
             },
-            onDismiss = { saleToRefund = null },
         )
     }
 }
@@ -618,12 +617,80 @@ private fun SaleRecordCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                if (sale.status == com.example.offlinepos.data.local.SaleStatus.COMPLETED) {
+                if (sale.status == com.example.offlinepos.data.local.SaleStatus.COMPLETED || sale.status == com.example.offlinepos.data.local.SaleStatus.PARTIALLY_REFUNDED) {
                     TextButton(onClick = onRefund, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
-                        Text("Return / Refund", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                        Text("Return / Partial", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
                     }
                 } else {
                     Text(sale.status, fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartialReturnDialog(
+    sale: SaleEntity,
+    items: List<SaleItemEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (Map<Long, Long>) -> Unit,
+) {
+    var quantities by remember(items) {
+        mutableStateOf(items.associate { it.lineId to "0" })
+    }
+    val returnableItems = items.filter { it.quantity > it.returnedQuantity }
+    val selected = quantities.mapNotNull { (lineId, text) ->
+        text.toLongOrNull()?.takeIf { it > 0L }?.let { lineId to it }
+    }.toMap()
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.padding(12.dp),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Sale #${sale.saleId.take(8)} Return", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("ပစ္စည်းတစ်ခုချင်းစီ ပြန်အပ်မည့် အရေအတွက်ကို ရွေးပါ။ 0 ထားပါက မပြန်အပ်ပါ။", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(10.dp))
+                if (returnableItems.isEmpty()) {
+                    Text("ပြန်အပ်ရန် ကျန်ရှိသော ပစ္စည်း မရှိတော့ပါ။", color = MaterialTheme.colorScheme.error)
+                } else {
+                    LazyColumn(modifier = Modifier.height(260.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(returnableItems, key = { it.lineId }) { item ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(item.productNameSnapshot, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("ဝယ်ထား: ${item.quantity} ${item.unitName} • ကျန် return: ${item.quantity - item.returnedQuantity}", fontSize = 10.sp, color = Color.Gray)
+                                }
+                                OutlinedTextField(
+                                    value = quantities[item.lineId] ?: "0",
+                                    onValueChange = { value ->
+                                        quantities = quantities.toMutableMap().apply { put(item.lineId, value.filter { it.isDigit() }) }
+                                    },
+                                    label = { Text("Qty") },
+                                    singleLine = true,
+                                    modifier = Modifier.width(82.dp),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            quantities = quantities.mapValues { (_, _) -> "0" }.toMutableMap().apply {
+                                returnableItems.forEach { put(it.lineId, (it.quantity - it.returnedQuantity).toString()) }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("ကျန်ရှိသမျှအားလုံး ပြန်အပ်မည် (Full Return)") }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("မလုပ်တော့ပါ") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = { onConfirm(selected) }, enabled = selected.isNotEmpty()) { Text("Return အတည်ပြုမည်") }
                 }
             }
         }

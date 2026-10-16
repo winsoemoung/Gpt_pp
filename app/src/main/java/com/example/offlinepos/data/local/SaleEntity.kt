@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 object SaleStatus {
     const val COMPLETED = "COMPLETED"
     const val VOIDED = "VOIDED"
+    const val PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED"
     const val REFUNDED = "REFUNDED"
 }
 

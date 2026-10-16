@@ -50,6 +50,15 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Backup export/import runs SQLite integrity validation and retains the newest three backup files.
 - Version 3.2.0 / versionCode 4.
 
+## New4 repair update
+
+- Replaced the default in-app store logo fallback with the newly supplied logo image.
+- Added product-line partial returns from Sales History: choose a return quantity for each product in a sale.
+- Full-sale returns remain available through the same dialog by selecting all remaining quantities.
+- Added Room migration 5→6 with per-line `returnedQuantity` tracking and `PARTIALLY_REFUNDED` sale status.
+- Return operations restore stock atomically and write an audit event for partial or full returns.
+- Version 4.0.0 / versionCode 5.
+
 ## Requirements
 
 - Android Studio with Android SDK 36

@@ -1517,6 +1517,28 @@ class PosViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    fun refundSaleItems(saleId: String, quantitiesByLineId: Map<Long, Long>, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val success = db.checkoutDao().refundSaleItems(
+                    saleId = saleId,
+                    requestedReturns = quantitiesByLineId,
+                    now = System.currentTimeMillis(),
+                    actorId = _actor.value.userId,
+                )
+                withContext(Dispatchers.Main) {
+                    onComplete(
+                        success,
+                        if (success) "Sale #${saleId.take(8)} အတွင်း ရွေးချယ်ထားသော ပစ္စည်းများကို Return ပြုလုပ်ပြီး stock ပြန်တိုးပေးပါပြီ"
+                        else "ဤ sale အတွင်း ရွေးချယ်ထားသော return quantity မမှန်ကန်ပါ",
+                    )
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onComplete(false, "Partial return မအောင်မြင်ပါ: ${e.message}") }
+            }
+        }
+    }
+
     fun archiveProduct(productId: Long) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()

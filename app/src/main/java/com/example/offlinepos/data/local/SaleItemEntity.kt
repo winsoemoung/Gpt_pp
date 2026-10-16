@@ -26,4 +26,5 @@ data class SaleItemEntity(
     val lineTaxMinor: Long,
     val lineTotalMinor: Long,
     val unitName: String = "ခု",
+    val returnedQuantity: Long = 0L,
 )
