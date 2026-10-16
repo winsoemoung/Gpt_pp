@@ -79,6 +79,15 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Added CSV upload/download actions to the Inventory top bar.
 - Version 5.0.0 / versionCode 7.
 
+## New5-2 compact dashboard UI update
+
+- Reduced the three sales dashboard KPI cards to compact equal-width cards.
+- Changed KPI card text to concise English labels: `Today Sales`, `Outstanding Credit`, and `Low Stock`.
+- Reduced icon, padding, corner radius, typography, and inter-card spacing.
+- Reduced Barcode / Held / Customer / Shift quick-action tiles to compact 88dp tiles with smaller icons and labels.
+- Preserved accessibility content descriptions and Material 3 touch targets.
+- Version 5.0.1 / versionCode 8.
+
 ### Known scope not included in New5
 
 - Supplier debt/payment ledger is not yet a separate accounting module; purchase supplier totals and invoice references are available.

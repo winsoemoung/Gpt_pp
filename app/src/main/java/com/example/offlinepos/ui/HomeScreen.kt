@@ -506,19 +506,19 @@ private fun PremiumDashboard(
                 Text("LIVE", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), fontSize = 10.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             DashboardMetricCard(
-                title = "ယနေ့အရောင်း", value = "%,d Ks".format(revenueAnimated.toLong()),
-                detail = "${todaySales.size} ဘောင်ချာ", icon = { Icon(Icons.Default.TrendingUp, null) },
-                accent = Color(0xFFB45309), modifier = Modifier.weight(1.2f),
+                title = "Today Sales", value = "%,d Ks".format(revenueAnimated.toLong()),
+                detail = "${todaySales.size} receipts", icon = { Icon(Icons.Default.TrendingUp, null) },
+                accent = Color(0xFFB45309), modifier = Modifier.weight(1f),
             )
             DashboardMetricCard(
-                title = "ဖောက်သည်အကြွေး", value = "%,d Ks".format(credit), detail = "Outstanding credit",
+                title = "Outstanding Credit", value = "%,d Ks".format(credit), detail = "Customer balance",
                 icon = { Icon(Icons.Default.AccountBalanceWallet, null) }, accent = Color(0xFF7C3AED), modifier = Modifier.weight(1f),
             )
             DashboardMetricCard(
-                title = "လက်ကျန်သတိပေး", value = "$lowStock", detail = "ပစ္စည်းများ",
-                icon = { Icon(Icons.Default.ErrorOutline, null) }, accent = Color(0xFFDC2626), modifier = Modifier.weight(0.82f),
+                title = "Low Stock", value = "$lowStock", detail = "Items to check",
+                icon = { Icon(Icons.Default.ErrorOutline, null) }, accent = Color(0xFFDC2626), modifier = Modifier.weight(1f),
             )
         }
     }
@@ -535,7 +535,7 @@ private fun DashboardMetricCard(
 ) {
     ElevatedCard(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp),
     ) {
@@ -543,17 +543,17 @@ private fun DashboardMetricCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.18f), Color.Transparent)))
-                .padding(10.dp),
+                .padding(horizontal = 7.dp, vertical = 6.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Surface(shape = CircleShape, color = accent.copy(alpha = 0.16f), modifier = Modifier.size(28.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Surface(shape = CircleShape, color = accent.copy(alpha = 0.16f), modifier = Modifier.size(22.dp)) {
                     Box(contentAlignment = Alignment.Center) {
                         CompositionLocalProvider(LocalContentColor provides accent) { icon() }
                     }
                 }
-                Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(detail, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(value, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, fontSize = 7.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -578,7 +578,7 @@ private fun QuickActionsRow(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item { QuickActionTile("Barcode", "Scan", Icons.Default.QrCodeScanner, Color(0xFF2563EB), onScan) }
             item { QuickActionTile("Held", "Orders", Icons.Default.PauseCircleOutline, Color(0xFF7C3AED), onHeldOrders) }
-            item { QuickActionTile("Customers", "Ledger", Icons.Default.People, Color(0xFF059669), onCustomers) }
+            item { QuickActionTile("Customer", "Ledger", Icons.Default.People, Color(0xFF059669), onCustomers) }
             item { QuickActionTile("Shift", "Report", Icons.Default.Assessment, Color(0xFFB45309), onShiftReport) }
         }
     }
@@ -594,24 +594,24 @@ private fun QuickActionTile(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
         border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.22f)),
-        modifier = Modifier.width(104.dp),
+        modifier = Modifier.width(88.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(shape = CircleShape, color = accent.copy(alpha = 0.14f), modifier = Modifier.size(30.dp)) {
+            Surface(shape = CircleShape, color = accent.copy(alpha = 0.14f), modifier = Modifier.size(24.dp)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
+                    Icon(icon, contentDescription = title, tint = accent, modifier = Modifier.size(14.dp))
                 }
             }
             Spacer(modifier = Modifier.width(7.dp))
             Column {
-                Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text(subtitle, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(title, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(subtitle, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
     }
