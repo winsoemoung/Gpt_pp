@@ -205,11 +205,10 @@ fun MainApp(viewModel: PosViewModel) {
             onQuantityChange = { id, qty -> viewModel.updateQuantity(id, qty) },
             onRemoveItem = { id -> viewModel.removeFromCart(id) },
             onApplyDiscount = { id, disc -> viewModel.applyDiscount(id, disc) },
-            onUpdateTaxRate = { viewModel.setTaxRate(it) },
             onApplyPromoCode = { viewModel.applyPromoCodeToCart(it) },
             onClearCart = { viewModel.clearCart() },
             onRequestManagerUnlock = {
-                viewModel.setBanner("မန်နေဂျာ စနစ်ဖွင့်ရန် Settings တွင် PIN 1234 ရိုက်ထည့်ပါ")
+                viewModel.setBanner("လျှော့စျေးကို တိုက်ရိုက်အသုံးပြုနိုင်ပါသည်")
             },
             onProceedToCheckout = {
                 showCartSheet = false

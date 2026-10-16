@@ -135,30 +135,6 @@ fun AiCopilotScreen(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                // Offline ready badge (matching HomeScreen)
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFFDCFCE7),
-                                    modifier = Modifier.padding(2.dp),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .background(Color(0xFF16A34A), CircleShape)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Offline",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF15803D),
-                                        )
-                                    }
-                                }
                             }
                             Text(
                                 text = if (actor.userId.contains("Cashier") || actor.userId.contains("အရောင်းတာဝန်ခံ")) "SanThit" else actor.userId,

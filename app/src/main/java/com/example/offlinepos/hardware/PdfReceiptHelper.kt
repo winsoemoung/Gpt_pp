@@ -171,13 +171,6 @@ object PdfReceiptHelper {
             y += 18f
         }
 
-        if (receipt.taxMinor > 0) {
-            paint.textAlign = Paint.Align.LEFT
-            canvas.drawText("အခွန် (${storeProfile.taxRatePercent}%):", 160f, y, paint)
-            paint.textAlign = Paint.Align.RIGHT
-            canvas.drawText("%,d Ks".format(receipt.taxMinor), pageWidth - 30f, y, paint)
-            y += 18f
-        }
 
         if (receipt.deliveryFeeMinor > 0) {
             paint.textAlign = Paint.Align.LEFT

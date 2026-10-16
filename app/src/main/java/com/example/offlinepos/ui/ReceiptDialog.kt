@@ -237,10 +237,6 @@ fun ReceiptDialog(
                         if (receipt.totals.discountMinor > 0) {
                             ReceiptRow("လျှော့စျေး (Discount)", "-%,d Ks".format(receipt.totals.discountMinor), isNegative = true)
                         }
-                        if (receipt.totals.taxMinor > 0) {
-                            val taxLabel = if (storeProfile.taxRatePercent % 1.0 == 0.0) "${storeProfile.taxRatePercent.toInt()}%" else "%.1f%%".format(storeProfile.taxRatePercent)
-                            ReceiptRow("အခွန် (Tax $taxLabel)", "%,d Ks".format(receipt.totals.taxMinor))
-                        }
                         if (receipt.deliveryFeeMinor > 0) {
                             ReceiptRow("သယ်ယူ ပို့ဆောင်ခ", "%,d Ks".format(receipt.deliveryFeeMinor))
                         }

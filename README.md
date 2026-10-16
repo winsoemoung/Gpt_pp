@@ -27,6 +27,15 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Category chips, recent searches, multi-unit product labels, and a modern cart/checkout flow
 - Delivery-fee-aware receipts and Unicode-safe Burmese labels for PDF and Bluetooth output
 
+## new2 shop mode
+
+- No PIN system, default PIN, or role-switching UI is included.
+- Discounts can be used directly by the single-shop operator.
+- Tax is permanently disabled at 0%; tax controls and tax rows are omitted from checkout and receipts.
+- The Main POS Server starts **OFF** when the app opens and starts only after the Settings toggle is turned ON.
+- The register header uses a clean store title without an `Offline` badge.
+- Database destructive-migration fallback is disabled so an unsupported schema change cannot silently erase shop data.
+
 ## Requirements
 
 - Android Studio with Android SDK 36

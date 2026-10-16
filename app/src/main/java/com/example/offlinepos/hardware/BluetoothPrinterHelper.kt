@@ -175,11 +175,6 @@ object BluetoothPrinterHelper {
             drawSummaryRow(canvas, "လျှော့စျေး (Discount):", "-%,d Ks".format(receipt.totals.discountMinor), y, paintBody)
             y += 28f
         }
-        if (receipt.totals.taxMinor > 0) {
-            val taxLabel = if (profile.taxRatePercent % 1.0 == 0.0) "${profile.taxRatePercent.toInt()}%" else "%.1f%%".format(profile.taxRatePercent)
-            drawSummaryRow(canvas, "အခွန် (Tax $taxLabel):", "%,d Ks".format(receipt.totals.taxMinor), y, paintBody)
-            y += 28f
-        }
 
         if (receipt.deliveryFeeMinor > 0) {
             drawSummaryRow(canvas, "သယ်ယူ ပို့ဆောင်ခ:", "%,d Ks".format(receipt.deliveryFeeMinor), y, paintBody)

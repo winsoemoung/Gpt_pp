@@ -37,7 +37,7 @@ class StoreConfig(context: Context) {
             headerNote = prefs.getString("store_header", "အိမ်ဆောက်ပစ္စည်း အမျိုးမျိုး လက်လီ/လက်ကား") ?: "အိမ်ဆောက်ပစ္စည်း အမျိုးမျိုး လက်လီ/လက်ကား",
             footerMessage = prefs.getString("store_footer", "ဝယ်ယူအားပေးမှုကို အထူးကျေးဇူးတင်ပါသည်\nပစ္စည်းမှန်၊ စျေးနှုန်းမှန်၊ အချိန်မှန်") ?: "ဝယ်ယူအားပေးမှုကို အထူးကျေးဇူးတင်ပါသည်\nပစ္စည်းမှန်၊ စျေးနှုန်းမှန်၊ အချိန်မှန်",
             autoBackupSchedule = prefs.getString("auto_backup_schedule", "DAILY") ?: "DAILY",
-            taxRatePercent = prefs.getFloat("store_tax_percent", 0.0f).toDouble(),
+            taxRatePercent = 0.0,
             customLogoPath = prefs.getString("store_custom_logo_path", null),
         )
     }
@@ -50,7 +50,7 @@ class StoreConfig(context: Context) {
             .putString("store_header", profile.headerNote)
             .putString("store_footer", profile.footerMessage)
             .putString("auto_backup_schedule", profile.autoBackupSchedule)
-            .putFloat("store_tax_percent", profile.taxRatePercent.toFloat())
+            .putFloat("store_tax_percent", 0.0f)
             .putString("store_custom_logo_path", profile.customLogoPath)
             .apply()
     }
@@ -62,18 +62,6 @@ class StoreConfig(context: Context) {
 
     fun setAiSuperuserGranted(granted: Boolean) {
         prefs.edit().putBoolean("ai_superuser_granted", granted).apply()
-    }
-
-    // Owner PIN (Default: 7870)
-    fun getOwnerPin(): String = prefs.getString("store_owner_pin", "7870") ?: "7870"
-    fun setOwnerPin(newPin: String) {
-        prefs.edit().putString("store_owner_pin", newPin).apply()
-    }
-
-    // Manager PIN (Default: 1234)
-    fun getManagerPin(): String = prefs.getString("store_manager_pin", "1234") ?: "1234"
-    fun setManagerPin(newPin: String) {
-        prefs.edit().putString("store_manager_pin", newPin).apply()
     }
 
     // Google Drive Backup Account

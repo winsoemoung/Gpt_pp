@@ -223,34 +223,6 @@ fun CartSheet(
                             )
                             .padding(12.dp),
                     ) {
-                        if (onUpdateTaxRate != null) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    text = "အခွန်နှုန်း (Tax %):",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    listOf(0.0, 5.0, 7.0, 10.0).forEach { rate ->
-                                        val label = if (rate == 0.0) "0%" else "${rate.toInt()}%"
-                                        FilterChip(
-                                            selected = taxRatePercent == rate,
-                                            onClick = { onUpdateTaxRate(rate) },
-                                            label = { Text(label, fontSize = 11.sp) },
-                                        )
-                                    }
-                                }
-                            }
-                            HorizontalDivider()
-                            Spacer(modifier = Modifier.height(4.dp))
-                        }
-
                         if (onApplyPromoCode != null) {
                             Row(
                                 modifier = Modifier
@@ -290,10 +262,6 @@ fun CartSheet(
                         SummaryRow("Subtotal", "%,d Ks".format(totals.subtotalMinor))
                         if (totals.discountMinor > 0) {
                             SummaryRow("Discount", "-%,d Ks".format(totals.discountMinor), isNegative = true)
-                        }
-                        if (totals.taxMinor > 0 || taxRatePercent > 0.0) {
-                            val rateStr = if (taxRatePercent % 1.0 == 0.0) "${taxRatePercent.toInt()}%" else "%.1f%%".format(taxRatePercent)
-                            SummaryRow("Tax ($rateStr)", "%,d Ks".format(totals.taxMinor))
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         HorizontalDivider()

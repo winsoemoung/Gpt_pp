@@ -101,7 +101,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         private set
 
     // Current cashier / actor
-    private val _actor = MutableStateFlow(Actor(userId = "SanThit", canApplyDiscount = false))
+    private val _actor = MutableStateFlow(Actor(userId = "SanThit", canApplyDiscount = true))
     val actor: StateFlow<Actor> = _actor.asStateFlow()
 
     // Products Flow
@@ -143,7 +143,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
     val shifts: StateFlow<List<ShiftReportEntity>> = db.operationsDao().observeAllShifts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Current Staff Role: OWNER (7870), MANAGER (1234), CASHIER
+    // Single-user shop mode; no role/PIN switching.
     private val _currentRole = MutableStateFlow("CASHIER")
     val currentRole: StateFlow<String> = _currentRole.asStateFlow()
 
@@ -231,7 +231,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
             AiChatMessage(
                 id = "welcome",
                 sender = MessageSender.AI,
-                text = "မင်္ဂလာပါ! ကျွန်ုပ်သည် 787 AI POS ကွပ်ကဲရေးမှူး ဖြစ်ပါသည်။\n\nဆိုင်၏ ပစ္စည်းအသစ်ထည့်သွင်းခြင်း၊ ဈေးနှုန်း/Code ပြင်ဆင်ခြင်း၊ အခွန်နှုန်းထား သတ်မှတ်ခြင်းနှင့် အရောင်းသုံးသပ်ချက်များကို စာရိုက်၍ တိုက်ရိုက် အမိန့်ပေးခိုင်းစေနိုင်ပါသည် (ဥပမာ - 'ဘိလပ်မြေ ၁၅၀၀၀ ဈေးဖြင့် ထည့်ပါ' သို့မဟုတ် 'အခွန်နှုန်း ၇% သတ်မှတ်ပါ')။",
+                text = "မင်္ဂလာပါ! ကျွန်ုပ်သည် POS အကူအညီပေးသူ ဖြစ်ပါသည်။\n\nဆိုင်၏ ပစ္စည်းအသစ်ထည့်သွင်းခြင်း၊ ဈေးနှုန်း/Code ပြင်ဆင်ခြင်းနှင့် အရောင်းသုံးသပ်ချက်များကို စာရိုက်၍ တိုက်ရိုက် အမိန့်ပေးခိုင်းစေနိုင်ပါသည် (ဥပမာ - 'ဘိလပ်မြေ ၁၅၀၀၀ ဈေးဖြင့် ထည့်ပါ')။",
                 timestampMs = System.currentTimeMillis(),
             )
         )
@@ -245,9 +245,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             seedConstructionCatalogIfEmpty()
         }
-        if (!storeConfig.isStaffClientMode()) {
-            startLocalServer()
-        }
+        // Main POS Server stays OFF when the app opens. It starts only after
+        // the user explicitly turns the Server switch ON in Settings.
     }
 
     private suspend fun seedConstructionCatalogIfEmpty() {
@@ -484,11 +483,11 @@ class PosViewModel(private val context: Context) : ViewModel() {
         setBanner("ဆိုင်အချက်အလက်များကို သိမ်းဆည်းပြီးပါပြီ")
     }
 
-    fun setTaxRate(percent: Double) {
-        val clamped = percent.coerceIn(0.0, 100.0)
-        val updatedProfile = _storeProfile.value.copy(taxRatePercent = clamped)
+    fun setTaxRate(@Suppress("UNUSED_PARAMETER") percent: Double) {
+        // Tax is disabled by design for this POS. Keep legacy callers safe at 0%.
+        val updatedProfile = _storeProfile.value.copy(taxRatePercent = 0.0)
         updateStoreProfile(updatedProfile)
-        refreshCartTax(clamped)
+        refreshCartTax(0.0)
     }
 
     fun refreshCartTax(rate: Double = _storeProfile.value.taxRatePercent) {
@@ -973,10 +972,6 @@ class PosViewModel(private val context: Context) : ViewModel() {
     }
 
     fun applyDiscount(productId: Long, discountAmountMinor: Long) {
-        if (!_actor.value.canApplyDiscount) {
-            setBanner("လျှော့စျေးပေးရန် မန်နေဂျာ PIN လိုအပ်ပါသည်")
-            return
-        }
         val currentList = _cart.value.toMutableList()
         val index = currentList.indexOfFirst { it.productId == productId }
         if (index >= 0) {
@@ -1005,24 +1000,6 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 setBanner("တွက်ချက်မှု အမှား: ${res.reason}")
             }
         }
-    }
-
-    fun authenticateManager(pin: String): Boolean {
-        val managerPin = storeConfig.getManagerPin()
-        val ownerPin = storeConfig.getOwnerPin()
-        return if (pin == managerPin || pin == ownerPin) {
-            _actor.value = Actor(userId = if (pin == ownerPin) "ဆိုင်ရှင် (Store Owner)" else "မန်နေဂျာ (Manager)", canApplyDiscount = true)
-            setBanner("မန်နေဂျာ/ဆိုင်ရှင် စနစ် ဖွင့်လှစ်ပြီးပါပြီ")
-            true
-        } else {
-            setBanner("မှားယွင်းသော PIN ဖြစ်ပါသည်")
-            false
-        }
-    }
-
-    fun setCashierMode() {
-        _actor.value = Actor(userId = "SanThit", canApplyDiscount = false)
-        setBanner("SanThit စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
     }
 
     fun checkout(
@@ -1127,98 +1104,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // Role switching
-    fun switchRole(role: String, pin: String): Boolean {
-        return when (role) {
-            "OWNER" -> {
-                if (pin == storeConfig.getOwnerPin()) {
-                    _currentRole.value = "OWNER"
-                    _actor.value = Actor(userId = "ဆိုင်ရှင် (Store Owner)", canApplyDiscount = true)
-                    setBanner("ဆိုင်ရှင် (Owner) စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
-                    true
-                } else {
-                    setBanner("ဆိုင်ရှင် PIN မှားယွင်းပါသည်")
-                    false
-                }
-            }
-            "MANAGER" -> {
-                if (pin == storeConfig.getManagerPin() || pin == storeConfig.getOwnerPin()) {
-                    _currentRole.value = "MANAGER"
-                    _actor.value = Actor(userId = "မန်နေဂျာ (Manager)", canApplyDiscount = true)
-                    setBanner("မန်နေဂျာ (Manager) စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
-                    true
-                } else {
-                    setBanner("မန်နေဂျာ PIN မှားယွင်းပါသည်")
-                    false
-                }
-            }
-            else -> {
-                _currentRole.value = "CASHIER"
-                _actor.value = Actor(userId = "SanThit", canApplyDiscount = false)
-                setBanner("SanThit စနစ်သို့ ပြောင်းလဲပြီးပါပြီ")
-                true
-            }
-        }
-    }
-
-    fun changeOwnerPin(oldPin: String, newPin: String): Boolean {
-        val current = storeConfig.getOwnerPin()
-        val isOldMatch = oldPin == current || (current == "7870" && oldPin == "787") || (current == "787" && oldPin == "7870")
-        if (!isOldMatch) {
-            setBanner("လက်ရှိ ဆိုင်ရှင် PIN မမှန်ကန်ပါ")
-            return false
-        }
-        if (newPin.length < 3) {
-            setBanner("PIN အသစ်သည် အနည်းဆုံး ၃ လုံး ရှိရပါမည်")
-            return false
-        }
-        storeConfig.setOwnerPin(newPin)
-        setBanner("ဆိုင်ရှင် PIN အသစ်ကို အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ")
-        return true
-    }
-
-    fun changeManagerPin(oldPin: String, newPin: String): Boolean {
-        val currentMgr = storeConfig.getManagerPin()
-        val currentOwner = storeConfig.getOwnerPin()
-        val isOldMatch = oldPin == currentMgr || oldPin == currentOwner || 
-                (currentOwner == "7870" && oldPin == "787") || (currentOwner == "787" && oldPin == "7870")
-        if (!isOldMatch) {
-            setBanner("လက်ရှိ မန်နေဂျာ/ဆိုင်ရှင် PIN မမှန်ကန်ပါ")
-            return false
-        }
-        if (newPin.length < 3) {
-            setBanner("PIN အသစ်သည် အနည်းဆုံး ၃ လုံး ရှိရပါမည်")
-            return false
-        }
-        storeConfig.setManagerPin(newPin)
-        setBanner("မန်နေဂျာ PIN အသစ်ကို အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ")
-        return true
-    }
-
-    // AI PIN lock state
-    private val _isAiUnlocked = MutableStateFlow(true)
-    val isAiUnlocked: StateFlow<Boolean> = _isAiUnlocked.asStateFlow()
-
-    fun unlockAiWithPin(pin: String): Boolean {
-        val ownerPin = storeConfig.getOwnerPin()
-        val managerPin = storeConfig.getManagerPin()
-        val isMatch = pin == ownerPin || pin == managerPin ||
-                (ownerPin == "7870" && pin == "787") || (ownerPin == "787" && pin == "7870") || pin == "787" || pin == "7870"
-        return if (isMatch) {
-            _isAiUnlocked.value = true
-            setBanner("AI ကွပ်ကဲရေးစင်တာကို ဖွင့်လှစ်ပြီးပါပြီ")
-            true
-        } else {
-            setBanner("PIN မှားယွင်းနေပါသည်")
-            false
-        }
-    }
-
-    fun lockAi() {
-        _isAiUnlocked.value = false
-        setBanner("AI စနစ်ကို ပြန်လည်သော့ခတ်ပြီးပါပြီ")
-    }
-
+    // AI features are available directly; this app intentionally has no PIN system.
     // Google Account Backup State
     private val _googleAccount = MutableStateFlow(storeConfig.getGoogleAccount())
     val googleAccount: StateFlow<String?> = _googleAccount.asStateFlow()
@@ -1762,8 +1648,6 @@ class PosViewModel(private val context: Context) : ViewModel() {
         _isStaffClientMode.value = isClient
         if (isClient) {
             stopLocalServer()
-        } else {
-            startLocalServer()
         }
     }
 
