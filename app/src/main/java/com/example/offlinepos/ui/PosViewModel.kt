@@ -20,6 +20,7 @@ import com.example.offlinepos.Sync.BackupManager
 import com.example.offlinepos.Sync.SyncWorker
 import com.example.offlinepos.Sync.GoogleDriveSyncManager
 import com.example.offlinepos.Sync.GoogleDriveSyncWorker
+import com.example.offlinepos.Sync.RecordLevelSyncManager
 import com.example.offlinepos.ai.AiAction
 import com.example.offlinepos.ai.AiActionType
 import com.example.offlinepos.ai.AiChatMessage
@@ -1200,8 +1201,9 @@ class PosViewModel(private val context: Context) : ViewModel() {
         }
         viewModelScope.launch(Dispatchers.IO) {
             val result = driveSyncManager.uploadLatestBackup(email)
+            val mergeResult = RecordLevelSyncManager(context.applicationContext).sync(email)
             withContext(Dispatchers.Main) {
-                if (result.isSuccess) {
+                if (result.isSuccess && mergeResult.isSuccess) {
                     recordGoogleBackupSuccess()
                     onComplete(true, "Google Drive သို့ အောင်မြင်စွာ Sync လုပ်ပြီးပါပြီ")
                 } else {

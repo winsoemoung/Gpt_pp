@@ -114,6 +114,7 @@ fun SettingsScreen(
     val serverIp by viewModel.serverIp.collectAsState()
     val receivedCount by viewModel.serverReceivedCount.collectAsState()
     var showServerDialog by remember { mutableStateOf(false) }
+    var settingsSection by remember { mutableStateOf("ALL") }
 
     val serverQrBitmap = remember(serverUrl, isServerRunning) {
         if (isServerRunning && serverUrl.isNotBlank()) {
@@ -195,6 +196,14 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text("Settings categories", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 2.dp)) {
+                items(listOf("ALL" to "အားလုံး", "STORE" to "ဆိုင်/ပြေစာ", "SYNC" to "Sync", "BUSINESS" to "လုပ်ငန်း", "SYSTEM" to "System")) { (key, label) ->
+                    FilterChip(selected = settingsSection == key, onClick = { settingsSection = key }, label = { Text(label, fontSize = 11.sp) })
+                }
+            }
+            if (settingsSection != "ALL") Text("ရွေးထားသော section ကိုသာ ပြသထားပါသည်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -220,6 +229,7 @@ fun SettingsScreen(
                 }
             }
 
+            if (settingsSection == "ALL" || settingsSection == "SYNC") {
             // Bluetooth thermal printer manager
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -256,6 +266,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (settingsSection == "ALL" || settingsSection == "STORE") {
             // Store Owner Header Profile Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -355,6 +367,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (settingsSection == "ALL" || settingsSection == "STORE") {
             // Store & Receipt Customization Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -462,6 +476,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (settingsSection == "ALL" || settingsSection == "SYNC") {
             // Tax is intentionally disabled for this store. All checkout totals remain tax-free (0%).
             // Database Backup, Export & Import, Google Drive
             Card(
@@ -624,6 +640,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (settingsSection == "ALL" || settingsSection == "BUSINESS") {
             // Quick Business Management Hub
             var showCustomerDialog by remember { mutableStateOf(false) }
             var showStockInDialog by remember { mutableStateOf(false) }
@@ -680,6 +698,8 @@ fun SettingsScreen(
                 ShiftReportDialog(viewModel = viewModel, onDismiss = { showShiftReportDialog = false })
             }
 
+            }
+            if (settingsSection == "ALL" || settingsSection == "BUSINESS") {
             // AI Superuser Privileges & Promo Code Card
             var aiSuperuserEnabled by remember { mutableStateOf(viewModel.isAiSuperuserGranted()) }
             Card(
@@ -773,6 +793,8 @@ fun SettingsScreen(
                 }
             }
 
+            }
+            if (settingsSection == "ALL" || settingsSection == "SYSTEM") {
             // 15C Main POS Server & Direct HTML5 Web Portal
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1009,6 +1031,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            }
             // Terminal Information
             Card(
                 modifier = Modifier.fillMaxWidth(),
