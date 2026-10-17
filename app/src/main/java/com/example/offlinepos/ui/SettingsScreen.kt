@@ -1,5 +1,9 @@
 package com.example.offlinepos.ui
 import android.app.Activity
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -57,10 +61,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +82,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
+import com.example.offlinepos.hardware.BluetoothPrinterHelper
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -91,6 +101,46 @@ fun SettingsScreen(
     var backupStatusMessage by remember { mutableStateOf<String?>(null) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var showRestoreChoice by remember { mutableStateOf(false) }
+    var pairedPrinters by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
+    val discoveredPrinters = remember { mutableStateListOf<BluetoothDevice>() }
+    var selectedPrinterAddress by remember { mutableStateOf(BluetoothPrinterHelper.selectedPrinterAddress(context)) }
+    var bluetoothMessage by remember { mutableStateOf<String?>(null) }
+    val bluetoothScope = rememberCoroutineScope()
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { pairedPrinters = BluetoothPrinterHelper.getPairedDevices(context) }
+    val discoveryReceiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                if (intent.action == BluetoothDevice.ACTION_FOUND) {
+                    val device = if (android.os.Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java) else @Suppress("DEPRECATION") intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    if (device != null && discoveredPrinters.none { it.address == device.address }) discoveredPrinters.add(device)
+                }
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        val filter = android.content.IntentFilter(BluetoothDevice.ACTION_FOUND)
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 33) context.registerReceiver(discoveryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            else @Suppress("DEPRECATION") context.registerReceiver(discoveryReceiver, filter)
+        } catch (_: Exception) { }
+        onDispose {
+            BluetoothPrinterHelper.cancelDiscovery(context)
+            try { context.unregisterReceiver(discoveryReceiver) } catch (_: Exception) { }
+        }
+    }
+    fun refreshPrinters() {
+        val permissions = if (android.os.Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT) else arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION)
+        val missing = permissions.filter { ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) bluetoothPermissionLauncher.launch(missing.toTypedArray())
+        else pairedPrinters = BluetoothPrinterHelper.getPairedDevices(context)
+    }
+    fun scanPrinters() {
+        refreshPrinters()
+        discoveredPrinters.clear()
+        bluetoothMessage = if (BluetoothPrinterHelper.startDiscovery(context)) "Nearby Bluetooth devices ရှာနေပါသည်..." else "Bluetooth permission သို့မဟုတ် Bluetooth state ကို စစ်ဆေးပါ"
+    }
     var showCandlestickChart by remember {
         mutableStateOf(context.getSharedPreferences("pos_settings", 0).getBoolean("show_sales_candlestick", true))
     }
@@ -174,6 +224,40 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("🖨️ Bluetooth Printer Manager", fontWeight = FontWeight.Bold)
+                    Text("Printer ကို app အတွင်း scan/pair ရွေးချယ်ပြီး connection ပျက်လျှင် ၃ ကြိမ် အလိုအလျောက် ပြန်ချိတ်ပါမည်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { scanPrinters() }, modifier = Modifier.weight(1f)) { Text("Scan", fontSize = 12.sp) }
+                        OutlinedButton(onClick = { refreshPrinters() }, modifier = Modifier.weight(1f)) { Text("Paired", fontSize = 12.sp) }
+                    }
+                    val allPrinters = (pairedPrinters + discoveredPrinters).distinctBy { it.address }
+                    allPrinters.forEach { device ->
+                        val address = runCatching { device.address }.getOrDefault("")
+                        val name = runCatching { device.name ?: "Unknown Printer" }.getOrDefault("Unknown Printer")
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                Text(address, style = MaterialTheme.typography.labelSmall)
+                            }
+                            TextButton(onClick = { BluetoothPrinterHelper.selectPrinter(context, device); selectedPrinterAddress = address; bluetoothMessage = "Printer ကို ရွေးပြီးပါပြီ" }) { Text(if (selectedPrinterAddress == address) "Selected" else "Use", fontSize = 11.sp) }
+                            TextButton(onClick = { if (BluetoothPrinterHelper.requestPairing(device)) bluetoothMessage = "Pairing request ပို့ပြီးပါပြီ" else bluetoothMessage = "Pairing မအောင်မြင်ပါ" }) { Text("Pair", fontSize = 11.sp) }
+                        }
+                    }
+                    if (selectedPrinterAddress != null) {
+                        Text("Selected: $selectedPrinterAddress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        val selected = allPrinters.firstOrNull { it.address == selectedPrinterAddress }
+                        Button(onClick = { selected?.let { device -> bluetoothScope.launch { bluetoothMessage = BluetoothPrinterHelper.testPrint(device).second } } ?: run { bluetoothMessage = "Printer ကို အရင်ရွေးပါ" } }, modifier = Modifier.fillMaxWidth()) { Text("Test Print") }
+                    }
+                    bluetoothMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                }
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),

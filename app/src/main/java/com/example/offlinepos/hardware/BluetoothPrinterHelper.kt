@@ -14,6 +14,7 @@ import android.graphics.Typeface
 import com.example.offlinepos.ui.ReceiptData
 import com.example.offlinepos.ui.StoreProfile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.OutputStream
 import java.text.SimpleDateFormat
@@ -24,6 +25,74 @@ import java.util.UUID
 object BluetoothPrinterHelper {
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     const val PRINTER_WIDTH_DOTS = 576 // 80mm standard: 576 dots (72 bytes)
+    private const val PREFS = "bluetooth_printer_prefs"
+    private const val SELECTED_ADDRESS = "selected_printer_address"
+
+    fun selectedPrinterAddress(context: Context): String? = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SELECTED_ADDRESS, null)
+
+    @SuppressLint("MissingPermission")
+    fun selectPrinter(context: Context, device: BluetoothDevice) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(SELECTED_ADDRESS, device.address).apply()
+    }
+
+    @SuppressLint("MissingPermission")
+    fun requestPairing(device: BluetoothDevice): Boolean = try {
+        device.bondState == BluetoothDevice.BOND_BONDED || device.createBond()
+    } catch (_: SecurityException) { false }
+
+    @SuppressLint("MissingPermission")
+    fun startDiscovery(context: Context): Boolean = try {
+        val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+        adapter?.cancelDiscovery()
+        adapter?.startDiscovery() == true
+    } catch (_: Exception) { false }
+
+    @SuppressLint("MissingPermission")
+    fun cancelDiscovery(context: Context) {
+        try { ((context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter ?: BluetoothAdapter.getDefaultAdapter())?.cancelDiscovery() } catch (_: Exception) {}
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun connectWithRetry(device: BluetoothDevice): BluetoothSocket {
+        var lastError: Throwable? = null
+        repeat(3) { attempt ->
+            var candidate: BluetoothSocket? = null
+            try {
+                if (device.bondState != BluetoothDevice.BOND_BONDED) {
+                    if (!requestPairing(device)) error("Printer pairing မအောင်မြင်ပါ")
+                    delay(800L)
+                }
+                BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
+                candidate = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                candidate.connect()
+                if (candidate.isConnected) return candidate
+                error("Printer socket မချိတ်ဆက်နိုင်ပါ")
+            } catch (t: Throwable) {
+                lastError = t
+                try { candidate?.close() } catch (_: Exception) {}
+                if (attempt < 2) delay(400L * (1L shl attempt))
+            }
+        }
+        throw lastError ?: IllegalStateException("Printer connection failed")
+    }
+
+    @SuppressLint("MissingPermission")
+    suspend fun testPrint(device: BluetoothDevice): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        var socket: BluetoothSocket? = null
+        try {
+            socket = connectWithRetry(device)
+            socket.outputStream.use { out ->
+                out.write(EscPos.INIT)
+                out.write("\n*** POS TEST PRINT ***\nBluetooth connection OK\n\n".toByteArray(Charsets.UTF_8))
+                out.write(byteArrayOf(0x1B, 0x64, 0x03))
+                out.write(EscPos.CUT)
+                out.flush()
+            }
+            true to "Test Print အောင်မြင်ပါသည်"
+        } catch (e: Exception) {
+            false to "Test Print မအောင်မြင်ပါ: ${e.message ?: "စစ်ဆေးရန်လိုပါသည်"}"
+        } finally { try { socket?.close() } catch (_: Exception) {} }
+    }
 
     @SuppressLint("MissingPermission")
     fun getPairedDevices(context: Context): List<BluetoothDevice> {
@@ -279,8 +348,7 @@ object BluetoothPrinterHelper {
             val bitmap = renderReceiptBitmap(receipt, profile)
             val rasterData = convertBitmapToEscPos(bitmap)
 
-            socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            socket.connect()
+            socket = connectWithRetry(device)
             outputStream = socket.outputStream
 
             // Send Init, Print Bitmap, Feed & Cut Paper, Kick Cash Drawer
