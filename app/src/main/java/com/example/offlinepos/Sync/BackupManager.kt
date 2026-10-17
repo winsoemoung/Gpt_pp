@@ -50,7 +50,10 @@ class BackupManager(
     }
 
     private fun configureConnection() {
-        db.openHelper.writableDatabase.execSQL("PRAGMA busy_timeout=30000")
+        // PRAGMA returns a result row on Android; execSQL() rejects it as a query.
+        db.openHelper.writableDatabase
+            .query(SimpleSQLiteQuery("PRAGMA busy_timeout=30000"))
+            .use { it.moveToFirst() }
     }
 
     fun sha256(file: File): String {
