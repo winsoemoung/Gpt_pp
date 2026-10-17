@@ -55,6 +55,8 @@ import com.example.offlinepos.ui.SalesHistoryScreen
 import com.example.offlinepos.ui.SettingsScreen
 import com.example.offlinepos.ui.StaffClientScreen
 import com.example.offlinepos.ui.theme.OfflinePOSTheme
+import com.example.offlinepos.data.local.AppDatabase
+import java.io.File
 
 enum class PosTab(val title: String) {
     REGISTER("အရောင်း"),
@@ -71,7 +73,7 @@ class MainActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 787)
         }
-        val viewModel = PosViewModel(applicationContext)
+        val viewModel = createViewModelSafely()
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             "weekly_stock_recommendation",
             ExistingPeriodicWorkPolicy.KEEP,
@@ -88,6 +90,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             OfflinePOSTheme {
                 MainApp(viewModel = viewModel)
+            }
+        }
+    }
+
+    private fun createViewModelSafely(): PosViewModel {
+        return try {
+            PosViewModel(applicationContext)
+        } catch (firstError: Throwable) {
+            runCatching {
+                AppDatabase.closeAndReset()
+                val db = getDatabasePath("offline_pos.db")
+                if (db.exists()) db.renameTo(File(db.parentFile, "offline_pos.recovery-${System.currentTimeMillis()}.db"))
+                File(db.path + "-wal").delete()
+                File(db.path + "-shm").delete()
+            }
+            try {
+                PosViewModel(applicationContext)
+            } catch (secondError: Throwable) {
+                throw IllegalStateException("POS database initialization failed", secondError)
             }
         }
     }
