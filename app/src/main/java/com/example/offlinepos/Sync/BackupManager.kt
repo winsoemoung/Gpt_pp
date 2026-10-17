@@ -32,9 +32,11 @@ class BackupManager(
                 val temp = File(target.parentFile, ".${target.name}.tmp.$attempt")
                 temp.delete()
                 try {
-                    db.openHelper.writableDatabase
-                        .query(SimpleSQLiteQuery("VACUUM INTO ?", arrayOf(temp.absolutePath)))
-                        .use { it.moveToFirst() }
+                    // VACUUM INTO is a SQLite command, not a SELECT query. Android's
+                    // SupportSQLiteDatabase.query() rejects it with code 0 / SQLITE_OK.
+                    // Quote the controlled cache path and execute it through execSQL.
+                    val escapedPath = temp.absolutePath.replace("'", "''")
+                    db.openHelper.writableDatabase.execSQL("VACUUM INTO '$escapedPath'")
                     check(temp.renameTo(target)) { "Unable to finalize database snapshot" }
                     return
                 } catch (error: Throwable) {
