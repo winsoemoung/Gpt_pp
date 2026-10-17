@@ -478,6 +478,21 @@ fun SettingsScreen(
 
             }
             if (settingsSection == "ALL" || settingsSection == "SYNC") {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("🔄 Two-device Record Sync", fontWeight = FontWeight.Bold)
+                    Text("Owner phone နှင့် cashier phone အတွက် SKU-based product identity သုံးပါသည်။ Conflict ဖြစ်လျှင် နောက်ဆုံးပြင်ဆင်ထားသော record ကို ဦးစားပေးပါသည်။", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val recordSyncPrefs = context.getSharedPreferences("pos_sync_status", 0)
+                    val recordSyncTime = recordSyncPrefs.getLong("last_record_sync_ms", 0L)
+                    Text(if (recordSyncTime > 0L) "Last record merge: ${SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()).format(Date(recordSyncTime))}" else "Record merge sync မလုပ်ရသေးပါ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text("Delete များကို tombstone ဖြင့် sync ပြုလုပ်ပါသည်။ Internet မရှိလျှင် နောက်တစ်ကြိမ် ပြန်ကြိုးစားပါမည်။", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             // Tax is intentionally disabled for this store. All checkout totals remain tax-free (0%).
             // Database Backup, Export & Import, Google Drive
             Card(

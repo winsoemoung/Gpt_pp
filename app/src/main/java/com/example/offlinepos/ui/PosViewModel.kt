@@ -1317,6 +1317,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 db.customerDao().deleteCustomer(customerId)
+                RecordLevelSyncManager(context.applicationContext).recordTombstone(db, "customers", customerId.toString())
                 withContext(Dispatchers.Main) {
                     onResult(true, "ဝယ်သူအချက်အလက်ကို အောင်မြင်စွာ ဖျက်ပစ်ပြီးပါပြီ")
                 }
@@ -1439,6 +1440,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     )
                 }
                 db.operationsDao().deleteParkedOrder(parkId)
+                RecordLevelSyncManager(context.applicationContext).recordTombstone(db, "parked_orders", parkId)
                 withContext(Dispatchers.Main) {
                     _cart.value = restoredItems
                     recalculateTotals(restoredItems)
