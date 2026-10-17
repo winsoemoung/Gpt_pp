@@ -117,6 +117,16 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - Added Android notification permission handling and a Compose status card explaining the weekly recommendation schedule.
 - Version 5.1.1 / versionCode 11.
 
+## New6 Google Drive Sync
+
+- Added Android Google Sign-In using the supplied installed OAuth client; the OAuth JSON/secret is not bundled in the APK or committed to GitHub.
+- Added Drive `appDataFolder` backup upload for the complete Room database snapshot.
+- Added authenticated upload/update of one private `offline_pos_backup.db` file, avoiding duplicate backup files.
+- Added a 15-minute network-constrained background sync worker and immediate sync enqueue after a successful sale.
+- Added Settings Secure Sign-In, Sync Now, connected-account status, last-sync time, and disconnect controls using Jetpack Compose.
+- Offline POS operation remains available; pending Drive sync retries when the network becomes available.
+- Version 6.0.0 / versionCode 12.
+
 ### New5-4 forecast scope
 
 - Supplier lead time, purchase orders, holidays, and weather are not yet modeled because those data fields are not present in the current database.

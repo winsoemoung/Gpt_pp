@@ -10,6 +10,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.offlinepos.Sync.WeeklyRecommendationWorker
+import com.example.offlinepos.Sync.GoogleDriveSyncWorker
 import java.util.concurrent.TimeUnit
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -75,6 +76,13 @@ class MainActivity : ComponentActivity() {
             "weekly_stock_recommendation",
             ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<WeeklyRecommendationWorker>(7, TimeUnit.DAYS).build(),
+        )
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "google-drive-background-sync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            PeriodicWorkRequestBuilder<GoogleDriveSyncWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(GoogleDriveSyncWorker.constraints())
+                .build(),
         )
 
         setContent {

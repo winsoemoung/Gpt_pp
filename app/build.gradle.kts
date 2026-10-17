@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.offlinepos.knzeso"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "5.1.1"
+        versionCode = 12
+        versionName = "6.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.coro.android)
     implementation(libs.work.runtime.ktx)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.core)

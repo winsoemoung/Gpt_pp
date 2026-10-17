@@ -18,6 +18,8 @@ import com.example.offlinepos.Repository.CheckoutResult
 import com.example.offlinepos.Repository.PaymentRequest
 import com.example.offlinepos.Sync.BackupManager
 import com.example.offlinepos.Sync.SyncWorker
+import com.example.offlinepos.Sync.GoogleDriveSyncManager
+import com.example.offlinepos.Sync.GoogleDriveSyncWorker
 import com.example.offlinepos.ai.AiAction
 import com.example.offlinepos.ai.AiActionType
 import com.example.offlinepos.ai.AiChatMessage
@@ -64,6 +66,9 @@ import java.util.Date
 import kotlin.math.roundToLong
 import java.util.Locale
 import java.util.UUID
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
 
 class PosViewModel(private val context: Context) : ViewModel() {
     private var db = AppDatabase.get(context)
@@ -1087,6 +1092,9 @@ class PosViewModel(private val context: Context) : ViewModel() {
                             .setBackoffCriteria(SyncWorker.backoffPolicy, java.time.Duration.ofSeconds(30))
                             .build(),
                     )
+                    if (!_googleAccount.value.isNullOrBlank()) {
+                        enqueueGoogleDriveSync()
+                    }
                     val items = cartItems.map { item ->
                         SaleItemEntity(
                             saleId = result.saleId,
@@ -1158,6 +1166,58 @@ class PosViewModel(private val context: Context) : ViewModel() {
 
     private val _lastGoogleBackupTime = MutableStateFlow(storeConfig.getLastGoogleBackupTime())
     val lastGoogleBackupTime: StateFlow<Long> = _lastGoogleBackupTime.asStateFlow()
+    private val driveSyncManager = GoogleDriveSyncManager(context.applicationContext)
+
+    fun googleSignInIntent(): Intent {
+        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
+            .build()
+        return GoogleSignIn.getClient(context, options).signInIntent
+    }
+
+    fun handleGoogleSignInResult(data: Intent?): Boolean {
+        return try {
+            val account = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(Exception::class.java)
+            val email = account.email.orEmpty()
+            if (email.isBlank()) false else {
+                connectGoogleAccount(email)
+                enqueueGoogleDriveSync()
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun syncGoogleDriveNow(onComplete: (Boolean, String) -> Unit) {
+        val email = _googleAccount.value
+        if (email.isNullOrBlank()) {
+            onComplete(false, "Google Account ကို အရင်ချိတ်ဆက်ပါ")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = driveSyncManager.uploadLatestBackup(email)
+            withContext(Dispatchers.Main) {
+                if (result.isSuccess) {
+                    recordGoogleBackupSuccess()
+                    onComplete(true, "Google Drive သို့ အောင်မြင်စွာ Sync လုပ်ပြီးပါပြီ")
+                } else {
+                    onComplete(false, "Google Drive Sync မအောင်မြင်ပါ: ${result.exceptionOrNull()?.localizedMessage ?: "စစ်ဆေးရန်လိုပါသည်"}")
+                }
+            }
+        }
+    }
+
+    private fun enqueueGoogleDriveSync() {
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "google-drive-sync-now",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            androidx.work.OneTimeWorkRequestBuilder<GoogleDriveSyncWorker>()
+                .setConstraints(GoogleDriveSyncWorker.constraints())
+                .build(),
+        )
+    }
 
     fun connectGoogleAccount(email: String) {
         val trimmed = email.trim()
@@ -1173,6 +1233,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
     fun disconnectGoogleAccount() {
         storeConfig.clearGoogleAccount()
         _googleAccount.value = null
+        WorkManager.getInstance(context).cancelUniqueWork("google-drive-sync-now")
         setBanner("Google အကောင့် ချိတ်ဆက်မှု ဖြုတ်ပြီးပါပြီ")
     }
 

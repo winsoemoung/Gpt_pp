@@ -143,6 +143,16 @@ fun SettingsScreen(
         }
     }
 
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && viewModel.handleGoogleSignInResult(result.data)) {
+            backupStatusMessage = "Google Account ချိတ်ဆက်ပြီးပါပြီ။ Background Sync စတင်ပါမည်။"
+        } else {
+            backupStatusMessage = "Google Sign-In မအောင်မြင်ပါ သို့မဟုတ် ပယ်ဖျက်ခဲ့ပါသည်"
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -502,33 +512,11 @@ fun SettingsScreen(
                                 Text("အကောင့်ဖြုတ်မည်", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                             }
                             Button(
-                                onClick = {
-                                    try {
-                                        val exported = viewModel.exportDatabaseFile()
-                                        if (exported != null) {
-                                            viewModel.recordGoogleBackupSuccess()
-                                            val uri: Uri = try {
-                                                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", exported)
-                                            } catch (e: Exception) {
-                                                Uri.fromFile(exported)
-                                            }
-                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                type = "application/octet-stream"
-                                                putExtra(Intent.EXTRA_STREAM, uri)
-                                                putExtra(Intent.EXTRA_SUBJECT, "787 POS ဒေတာ Backup (${googleAccount})")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(Intent.createChooser(shareIntent, "Google Drive သို့ တင်ရန်"))
-                                            backupStatusMessage = "Google Drive သို့ Backup တင်ပို့ပြီးပါပြီ"
-                                        }
-                                    } catch (e: Exception) {
-                                        backupStatusMessage = "ချို့ယွင်းချက်ဖြစ်ပေါ်ပါသည်: ${e.localizedMessage}"
-                                    }
-                                },
+                                onClick = { viewModel.syncGoogleDriveNow { _, message -> backupStatusMessage = message } },
                                 modifier = Modifier.weight(1.3f).testTag("backup_to_drive_button"),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("☁️ Google Drive သို့ Backup", fontSize = 11.sp)
+                                Text("☁️ Sync Now", fontSize = 11.sp)
                             }
                         }
                     } else {
@@ -542,13 +530,11 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Button(
-                            onClick = {
-                                viewModel.connectGoogleAccount(googleEmailInput)
-                            },
+                            onClick = { googleSignInLauncher.launch(viewModel.googleSignInIntent()) },
                             modifier = Modifier.fillMaxWidth().testTag("connect_google_account_button"),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("🔗 Google Account ဖြင့် Log in / ချိတ်ဆက်မည်")
+                            Text("🔐 Google Account ဖြင့် Secure Sign-In / ချိတ်ဆက်မည်")
                         }
                     }
 
