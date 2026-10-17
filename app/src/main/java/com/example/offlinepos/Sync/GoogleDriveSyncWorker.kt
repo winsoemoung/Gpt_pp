@@ -14,8 +14,9 @@ class GoogleDriveSyncWorker(
     override suspend fun doWork(): Result {
         val account = StoreConfig(applicationContext).getGoogleAccount()?.trim().orEmpty()
         if (account.isBlank()) return Result.success()
-        val result = GoogleDriveSyncManager(applicationContext).uploadLatestBackup(account)
-        return if (result.isSuccess) {
+        val snapshotResult = GoogleDriveSyncManager(applicationContext).uploadLatestBackup(account)
+        val recordResult = RecordLevelSyncManager(applicationContext).sync(account)
+        return if (snapshotResult.isSuccess && recordResult.isSuccess) {
             StoreConfig(applicationContext).setLastGoogleBackupTime(System.currentTimeMillis())
             Result.success()
         } else {

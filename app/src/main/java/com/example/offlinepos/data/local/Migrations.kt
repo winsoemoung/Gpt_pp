@@ -88,6 +88,18 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_outbox_operationId ON sync_outbox(operationId)")
     }
 }
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS sync_tombstones (
+            tombstoneId TEXT NOT NULL PRIMARY KEY,
+            entityType TEXT NOT NULL,
+            entityId TEXT NOT NULL,
+            deletedAtEpochMs INTEGER NOT NULL,
+            deletedByDeviceId TEXT NOT NULL
+        )""")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_tombstones_entity ON sync_tombstones(entityType, entityId)")
+    }
+}
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
     MIGRATION_3_4,
@@ -96,4 +108,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_6_7,
     MIGRATION_7_8,
     MIGRATION_8_9,
+    MIGRATION_9_10,
 )

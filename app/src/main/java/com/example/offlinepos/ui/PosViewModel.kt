@@ -20,6 +20,7 @@ import com.example.offlinepos.Sync.BackupManager
 import com.example.offlinepos.Sync.SyncWorker
 import com.example.offlinepos.Sync.GoogleDriveSyncManager
 import com.example.offlinepos.Sync.GoogleDriveSyncWorker
+import com.example.offlinepos.Sync.RecordLevelSyncManager
 import com.example.offlinepos.ai.AiAction
 import com.example.offlinepos.ai.AiActionType
 import com.example.offlinepos.ai.AiChatMessage
@@ -1207,13 +1208,17 @@ class PosViewModel(private val context: Context) : ViewModel() {
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
-            val result = driveSyncManager.uploadLatestBackup(email)
+            val snapshotResult = driveSyncManager.uploadLatestBackup(email)
+            val recordResult = RecordLevelSyncManager(context.applicationContext).sync(email)
             withContext(Dispatchers.Main) {
-                if (result.isSuccess) {
+                if (snapshotResult.isSuccess && recordResult.isSuccess) {
                     recordGoogleBackupSuccess()
                     onComplete(true, "Google Drive သို့ အောင်မြင်စွာ Sync လုပ်ပြီးပါပြီ")
                 } else {
-                    onComplete(false, "Google Drive Sync မအောင်မြင်ပါ: ${result.exceptionOrNull()?.localizedMessage ?: "စစ်ဆေးရန်လိုပါသည်"}")
+                    val error = snapshotResult.exceptionOrNull()?.localizedMessage
+                        ?: recordResult.exceptionOrNull()?.localizedMessage
+                        ?: "စစ်ဆေးရန်လိုပါသည်"
+                    onComplete(false, "Google Drive Sync မအောင်မြင်ပါ: $error")
                 }
             }
         }
@@ -1259,6 +1264,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
             try {
                 val updated = product.copy(updatedAtEpochMs = System.currentTimeMillis())
                 val rows = db.productDao().update(updated)
+                enqueueGoogleDriveSync()
                 withContext(Dispatchers.Main) {
                     if (rows > 0) {
                         setBanner("'${product.name}' ၏ အချက်အလက်များကို အောင်မြင်စွာ ပြင်ဆင်ပြီးပါပြီ")
@@ -1291,6 +1297,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     createdAtEpochMs = System.currentTimeMillis()
                 )
                 db.customerDao().insertCustomer(customer)
+                enqueueGoogleDriveSync()
                 withContext(Dispatchers.Main) {
                     onResult(true, "ဝယ်သူ '$name' ကို စာရင်းသွင်းပြီးပါပြီ")
                 }
@@ -1306,6 +1313,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 db.customerDao().recordRepayment(customerId, amount, note, _actor.value.userId)
+                enqueueGoogleDriveSync()
                 withContext(Dispatchers.Main) {
                     onResult(true, "အကြွေးဆပ်ငွေ %,d Ks လက်ခံပြီးပါပြီ".format(amount))
                 }
@@ -1323,6 +1331,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 db.customerDao().deleteCustomer(customerId)
+                RecordLevelSyncManager(context.applicationContext).recordTombstone(db, "customers", customerId.toString())
+                enqueueGoogleDriveSync()
                 withContext(Dispatchers.Main) {
                     onResult(true, "ဝယ်သူအချက်အလက်ကို အောင်မြင်စွာ ဖျက်ပစ်ပြီးပါပြီ")
                 }
@@ -1376,6 +1386,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     )
                     if (existing == null) db.productDao().insert(product) else db.productDao().update(product)
                     imported++
+                    enqueueGoogleDriveSync()
                 }
                 withContext(Dispatchers.Main) { setBanner("Product CSV import ပြီးပါပြီ ($imported ခု)") }
             } catch (e: Exception) {
@@ -1415,6 +1426,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 createdAtEpochMs = System.currentTimeMillis()
             )
             db.operationsDao().insertParkedOrder(order)
+            enqueueGoogleDriveSync()
             withContext(Dispatchers.Main) {
                 clearCart()
                 setBanner("အော်ဒါ '$tag' ကို ဆိုင်းငံ့ထားပြီးပါပြီ")
@@ -1445,6 +1457,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     )
                 }
                 db.operationsDao().deleteParkedOrder(parkId)
+            enqueueGoogleDriveSync()
                 withContext(Dispatchers.Main) {
                     _cart.value = restoredItems
                     recalculateTotals(restoredItems)
@@ -1461,6 +1474,8 @@ class PosViewModel(private val context: Context) : ViewModel() {
     fun deleteParkedOrder(parkId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             db.operationsDao().deleteParkedOrder(parkId)
+            RecordLevelSyncManager(context.applicationContext).recordTombstone(db, "parked_orders", parkId)
+            enqueueGoogleDriveSync()
             withContext(Dispatchers.Main) {
                 setBanner("ဆိုင်းငံ့အော်ဒါကို ဖျက်လိုက်ပါပြီ")
             }
@@ -1495,6 +1510,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                 db.operationsDao().insertPurchase(purchase)
                 val now = System.currentTimeMillis()
                 db.productDao().adjustStock(productId, quantity, now)
+                enqueueGoogleDriveSync()
 
                 withContext(Dispatchers.Main) {
                     onResult(true, "'$productName' အဝင် (+$quantity) စာရင်းသွင်းပြီးပါပြီ")
@@ -1539,6 +1555,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     note = note
                 )
                 db.operationsDao().insertShift(shift)
+                enqueueGoogleDriveSync()
                 withContext(Dispatchers.Main) {
                     onResult(true, "နေ့ချုပ်စာရင်း (Z-Report) အောင်မြင်စွာ ပိတ်ပြီးပါပြီ")
                 }
@@ -1647,6 +1664,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                     updatedAtEpochMs = now,
                 )
                 db.productDao().insert(newEntity)
+                enqueueGoogleDriveSync()
                 onResult(true, "ကုန်ပစ္စည်း အသစ်ကို အောင်မြင်စွာ ထည့်သွင်းပြီးပါပြီ")
             } catch (e: Exception) {
                 onResult(false, e.message ?: "ကုန်ပစ္စည်းထည့်သွင်းခြင်း မအောင်မြင်ပါ")
@@ -1667,6 +1685,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
                         reason = "Manual inventory adjustment", createdAtEpochMs = now,
                     )
                 )
+                enqueueGoogleDriveSync()
                 setBanner("လက်ကျန်စာရင်း ပြင်ဆင်ပြီးပါပြီ")
             }
         }
