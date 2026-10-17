@@ -55,6 +55,8 @@ import com.example.offlinepos.ui.SalesHistoryScreen
 import com.example.offlinepos.ui.SettingsScreen
 import com.example.offlinepos.ui.StaffClientScreen
 import com.example.offlinepos.ui.theme.OfflinePOSTheme
+import com.example.offlinepos.data.local.AppDatabase
+import java.io.File
 
 enum class PosTab(val title: String) {
     REGISTER("အရောင်း"),
@@ -71,7 +73,7 @@ class MainActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 787)
         }
-        val viewModel = PosViewModel(applicationContext)
+        val viewModel = createViewModelWithDatabaseRecovery()
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             "weekly_stock_recommendation",
             ExistingPeriodicWorkPolicy.KEEP,
@@ -88,6 +90,27 @@ class MainActivity : ComponentActivity() {
         setContent {
             OfflinePOSTheme {
                 MainApp(viewModel = viewModel)
+            }
+        }
+    }
+
+    private fun createViewModelWithDatabaseRecovery(): PosViewModel {
+        return try {
+            PosViewModel(applicationContext)
+        } catch (firstError: Throwable) {
+            AppDatabase.closeAndReset()
+            val db = getDatabasePath("offline_pos.db")
+            val stamp = System.currentTimeMillis()
+            val backup = File(db.parentFile, "offline_pos.db.pre_recovery_$stamp")
+            if (db.exists()) db.renameTo(backup)
+            File(db.path + "-wal").takeIf { it.exists() }?.renameTo(File(db.parentFile, "offline_pos.db.pre_recovery_$stamp-wal"))
+            File(db.path + "-shm").takeIf { it.exists() }?.renameTo(File(db.parentFile, "offline_pos.db.pre_recovery_$stamp-shm"))
+            try {
+                PosViewModel(applicationContext).also {
+                    it.setBanner("Database migration ပြဿနာကြောင့် ယခင် database ကို recovery backup အဖြစ် သိမ်းထားပါသည်။")
+                }
+            } catch (secondError: Throwable) {
+                throw IllegalStateException("POS database could not be opened", secondError)
             }
         }
     }
