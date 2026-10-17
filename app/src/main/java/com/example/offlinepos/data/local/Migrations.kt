@@ -97,7 +97,15 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
             deletedAtEpochMs INTEGER NOT NULL,
             deletedByDeviceId TEXT NOT NULL
         )""")
-        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_tombstones_entity ON sync_tombstones(entityType, entityId)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_tombstones_entityType_entityId ON sync_tombstones(entityType, entityId)")
+    }
+}
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Repair new6-5 installations that created the old, non-Room index name.
+        db.execSQL("DROP INDEX IF EXISTS index_sync_tombstones_entity")
+        db.execSQL("DROP INDEX IF EXISTS index_sync_tombstones_entityType_entityId")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_tombstones_entityType_entityId ON sync_tombstones(entityType, entityId)")
     }
 }
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
@@ -109,4 +117,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_7_8,
     MIGRATION_8_9,
     MIGRATION_9_10,
+    MIGRATION_10_11,
 )
