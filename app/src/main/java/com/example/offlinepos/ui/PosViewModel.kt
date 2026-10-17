@@ -1174,9 +1174,16 @@ class PosViewModel(private val context: Context) : ViewModel() {
             .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
             .build()
 
-    fun googleSignInIntent(): Intent {
-        val options = googleSignInOptions()
-        return GoogleSignIn.getClient(context, options).signInIntent
+    fun googleSignInIntent(): Intent = GoogleSignIn.getClient(context, googleSignInOptions()).signInIntent
+
+    fun beginGoogleSignIn(onReady: (Intent) -> Unit) {
+        val client = GoogleSignIn.getClient(context, googleSignInOptions())
+        client.signOut().addOnCompleteListener {
+            storeConfig.clearGoogleAccount()
+            _googleAccount.value = null
+            WorkManager.getInstance(context).cancelUniqueWork("google-drive-sync-now")
+            onReady(client.signInIntent)
+        }
     }
 
     fun handleGoogleSignInResult(data: Intent?): Boolean {
@@ -1239,7 +1246,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         _googleAccount.value = null
         WorkManager.getInstance(context).cancelUniqueWork("google-drive-sync-now")
         GoogleSignIn.getClient(context, googleSignInOptions()).signOut()
-        setBanner("Google အကောင့် ချိတ်ဆက်မှု ဖြုတ်ပြီးပါပြီ")
+        setBanner("Google အကောင့် ချိတ်ဆက်မှု ဖြုတ်ပြီးပါပြီ။ နောက်တစ်ကြိမ် Log In တွင် account အသစ်ရွေးနိုင်ပါပြီ။")
     }
 
     fun recordGoogleBackupSuccess() {

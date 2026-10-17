@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.offlinepos.knzeso"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "7.0.0"
+        versionCode = 22
+        versionName = "8.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

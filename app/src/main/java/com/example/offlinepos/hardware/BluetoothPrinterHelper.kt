@@ -54,7 +54,14 @@ object BluetoothPrinterHelper {
                     delay(700L)
                 }
                 BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
-                socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                socket = when (attempt) {
+                    0 -> device.createRfcommSocketToServiceRecord(SPP_UUID)
+                    1 -> device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                    else -> runCatching {
+                        val method = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                        method.invoke(device, 1) as BluetoothSocket
+                    }.getOrElse { device.createRfcommSocketToServiceRecord(SPP_UUID) }
+                }
                 socket.connect()
                 if (socket.isConnected) return socket
                 error("Printer socket is not connected")
@@ -65,6 +72,26 @@ object BluetoothPrinterHelper {
             }
         }
         throw lastError ?: IllegalStateException("Unable to connect to printer")
+    }
+
+    @SuppressLint("MissingPermission")
+    suspend fun testPrint(device: BluetoothDevice): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        var socket: BluetoothSocket? = null
+        try {
+            socket = connectWithRetry(device)
+            socket.outputStream.use { output ->
+                output.write(EscPos.INIT)
+                output.write("\n*** POS TEST PRINT ***\nBluetooth connection OK\n\n".toByteArray(Charsets.UTF_8))
+                output.write(byteArrayOf(0x1B, 0x64, 0x03))
+                output.write(EscPos.CUT)
+                output.flush()
+            }
+            true to "Test Print အောင်မြင်ပါသည်"
+        } catch (error: Exception) {
+            false to "Test Print မအောင်မြင်ပါ: ${error.message ?: "Printer ကို စစ်ဆေးပါ"}"
+        } finally {
+            try { socket?.close() } catch (_: Exception) { }
+        }
     }
 
     @SuppressLint("MissingPermission")

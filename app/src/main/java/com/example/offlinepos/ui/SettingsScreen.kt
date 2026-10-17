@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.offlinepos.hardware.QrCodeHelper
 import com.example.offlinepos.hardware.BluetoothPrinterHelper
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +68,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.Alignment
@@ -159,6 +161,8 @@ fun SettingsScreen(
 
     var pairedPrinters by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
     var selectedPrinterAddress by remember { mutableStateOf(BluetoothPrinterHelper.selectedPrinterAddress(context)) }
+    var printerStatus by remember { mutableStateOf<String?>(null) }
+    val printerScope = rememberCoroutineScope()
     val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { pairedPrinters = BluetoothPrinterHelper.getPairedDevices(context) }
@@ -262,7 +266,15 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    if (selectedPrinterAddress != null) Text("Selected printer: $selectedPrinterAddress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    if (selectedPrinterAddress != null) {
+                        Text("Selected printer: $selectedPrinterAddress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        val selectedDevice = pairedPrinters.firstOrNull { it.address == selectedPrinterAddress }
+                        Button(onClick = {
+                            if (selectedDevice == null) printerStatus = "Selected printer ကို Refresh ပြီး ပြန်ရွေးပါ"
+                            else printerScope.launch { printerStatus = BluetoothPrinterHelper.testPrint(selectedDevice).second }
+                        }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("Test Print", fontSize = 12.sp) }
+                        printerStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                    }
                 }
             }
 
@@ -640,7 +652,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Button(
-                            onClick = { googleSignInLauncher.launch(viewModel.googleSignInIntent()) },
+                            onClick = { viewModel.beginGoogleSignIn { intent -> googleSignInLauncher.launch(intent) } },
                             modifier = Modifier.fillMaxWidth().testTag("connect_google_account_button"),
                             shape = RoundedCornerShape(8.dp)
                         ) {

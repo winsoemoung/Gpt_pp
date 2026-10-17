@@ -11,7 +11,10 @@ class BackupManager(
     private val db: AppDatabase,
     private val now: () -> Long,
 ) {
-    private val snapshotMutex = Mutex()
+    companion object {
+        // Shared across manual Sync Now and WorkManager instances in this process.
+        private val snapshotMutex = Mutex()
+    }
 
     suspend fun quiesce() = snapshotMutex.withLock {
         db.openHelper.writableDatabase.execSQL("PRAGMA busy_timeout=30000")
@@ -23,7 +26,7 @@ class BackupManager(
         snapshotMutex.withLock {
             db.openHelper.writableDatabase.execSQL("PRAGMA busy_timeout=30000")
             var lastError: Throwable? = null
-            repeat(4) { attempt ->
+            repeat(6) { attempt ->
                 val temp = File(target.parentFile, ".${target.name}.tmp.$attempt")
                 temp.delete()
                 try {
@@ -35,7 +38,7 @@ class BackupManager(
                 } catch (t: Throwable) {
                     lastError = t
                     temp.delete()
-                    if (attempt < 3) delay(250L * (1L shl attempt))
+                    if (attempt < 5) delay(350L * (1L shl attempt.coerceAtMost(4)))
                 }
             }
             throw lastError ?: IllegalStateException("Database snapshot failed")
