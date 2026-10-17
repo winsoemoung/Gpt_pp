@@ -107,6 +107,11 @@ fun SettingsScreen(
     val serverIp by viewModel.serverIp.collectAsState()
     val receivedCount by viewModel.serverReceivedCount.collectAsState()
     var showServerDialog by remember { mutableStateOf(false) }
+    var showCustomerDialog by remember { mutableStateOf(false) }
+    var showStockInDialog by remember { mutableStateOf(false) }
+    var showShiftReportDialog by remember { mutableStateOf(false) }
+    var expandedSection by remember { mutableStateOf("STORE") }
+    val settingsSections = listOf("STORE" to "ဆိုင်/ပြေစာ", "SYNC" to "Backup/Sync", "BUSINESS" to "လုပ်ငန်း", "SYSTEM" to "System")
 
     val serverQrBitmap = remember(serverUrl, isServerRunning) {
         if (isServerRunning && serverUrl.isNotBlank()) {
@@ -186,7 +191,16 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Text("ဆိုင်စနစ်ကို တစ်နေရာတည်းမှ ထိန်းချုပ်ပါ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Store · Receipt · Backup · Business · System", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f))
+                    Text("ခေါင်းစဉ်တစ်ခုကို နှိပ်ပြီး အသေးစိတ်များကို ဖွင့်ပါ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f))
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 2.dp)) {
+                items(settingsSections) { (key, title) ->
+                    FilterChip(
+                        selected = expandedSection == key,
+                        onClick = { expandedSection = key },
+                        label = { Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                    )
                 }
             }
             Card(
@@ -215,6 +229,7 @@ fun SettingsScreen(
             }
 
             // Store Owner Header Profile Card
+            if (expandedSection == "STORE") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -421,7 +436,9 @@ fun SettingsScreen(
             }
 
             // Tax is intentionally disabled for this store. All checkout totals remain tax-free (0%).
+            }
             // Database Backup, Export & Import, Google Drive
+            if (expandedSection == "SYNC") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -582,11 +599,9 @@ fun SettingsScreen(
                 }
             }
 
+            }
             // Quick Business Management Hub
-            var showCustomerDialog by remember { mutableStateOf(false) }
-            var showStockInDialog by remember { mutableStateOf(false) }
-            var showShiftReportDialog by remember { mutableStateOf(false) }
-
+            if (expandedSection == "BUSINESS") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -731,7 +746,9 @@ fun SettingsScreen(
                 }
             }
 
+            }
             // 15C Main POS Server & Direct HTML5 Web Portal
+            if (expandedSection == "SYSTEM") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -986,6 +1003,7 @@ fun SettingsScreen(
                     Text("• မြန်မာစာ ပရင့်စနစ်: Native High-Resolution Canvas Rendering", style = MaterialTheme.typography.bodySmall)
                     Text("• သိမ်းဆည်းမှု စနစ်: SQLite Room Database (အော့ဖ်လိုင်းအသုံးပြုနိုင်)", style = MaterialTheme.typography.bodySmall)
                 }
+            }
             }
         }
     }
