@@ -14,6 +14,12 @@ data class StoreProfile(
     val autoBackupSchedule: String,
     val taxRatePercent: Double = 0.0,
     val customLogoPath: String? = null,
+    val receiptHeaderStyle: String = "BOLD",
+    val receiptHeaderSize: String = "MEDIUM",
+    val receiptHeaderAlign: String = "CENTER",
+    val receiptFooterStyle: String = "NORMAL",
+    val receiptFooterSize: String = "MEDIUM",
+    val receiptFooterAlign: String = "CENTER",
 )
 
 data class PromoCode(
@@ -39,6 +45,12 @@ class StoreConfig(context: Context) {
             autoBackupSchedule = prefs.getString("auto_backup_schedule", "DAILY") ?: "DAILY",
             taxRatePercent = 0.0,
             customLogoPath = prefs.getString("store_custom_logo_path", null),
+            receiptHeaderStyle = prefs.getString("receipt_header_style", "BOLD") ?: "BOLD",
+            receiptHeaderSize = prefs.getString("receipt_header_size", "MEDIUM") ?: "MEDIUM",
+            receiptHeaderAlign = prefs.getString("receipt_header_align", "CENTER") ?: "CENTER",
+            receiptFooterStyle = prefs.getString("receipt_footer_style", "NORMAL") ?: "NORMAL",
+            receiptFooterSize = prefs.getString("receipt_footer_size", "MEDIUM") ?: "MEDIUM",
+            receiptFooterAlign = prefs.getString("receipt_footer_align", "CENTER") ?: "CENTER",
         )
     }
 
@@ -52,6 +64,12 @@ class StoreConfig(context: Context) {
             .putString("auto_backup_schedule", profile.autoBackupSchedule)
             .putFloat("store_tax_percent", 0.0f)
             .putString("store_custom_logo_path", profile.customLogoPath)
+            .putString("receipt_header_style", profile.receiptHeaderStyle)
+            .putString("receipt_header_size", profile.receiptHeaderSize)
+            .putString("receipt_header_align", profile.receiptHeaderAlign)
+            .putString("receipt_footer_style", profile.receiptFooterStyle)
+            .putString("receipt_footer_size", profile.receiptFooterSize)
+            .putString("receipt_footer_align", profile.receiptFooterAlign)
             .apply()
     }
 

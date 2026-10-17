@@ -121,6 +121,12 @@ fun SettingsScreen(
     var headerNote by remember(storeProfile) { mutableStateOf(storeProfile.headerNote) }
     var footerMessage by remember(storeProfile) { mutableStateOf(storeProfile.footerMessage) }
     var backupSchedule by remember(storeProfile) { mutableStateOf(storeProfile.autoBackupSchedule) }
+    var headerStyle by remember(storeProfile) { mutableStateOf(storeProfile.receiptHeaderStyle) }
+    var headerSize by remember(storeProfile) { mutableStateOf(storeProfile.receiptHeaderSize) }
+    var headerAlign by remember(storeProfile) { mutableStateOf(storeProfile.receiptHeaderAlign) }
+    var footerStyle by remember(storeProfile) { mutableStateOf(storeProfile.receiptFooterStyle) }
+    var footerSize by remember(storeProfile) { mutableStateOf(storeProfile.receiptFooterSize) }
+    var footerAlign by remember(storeProfile) { mutableStateOf(storeProfile.receiptFooterAlign) }
 
     // Logo image picker
     val logoPickerLauncher = rememberLauncherForActivityResult(
@@ -362,6 +368,16 @@ fun SettingsScreen(
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
+                    Text("ပြေစာ Header ဒီဇိုင်း", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    ReceiptStyleSelector("စာလုံးပုံစံ", headerStyle, listOf("NORMAL" to "ပုံမှန်", "BOLD" to "ထူ", "ITALIC" to "စောင်း", "BOLD_ITALIC" to "ထူ/စောင်း")) { headerStyle = it }
+                    ReceiptStyleSelector("စာလုံးအရွယ်", headerSize, listOf("SMALL" to "သေး", "MEDIUM" to "အလယ်", "LARGE" to "ကြီး")) { headerSize = it }
+                    ReceiptStyleSelector("နေရာချထားမှု", headerAlign, listOf("LEFT" to "ဘယ်", "CENTER" to "အလယ်", "RIGHT" to "ညာ")) { headerAlign = it }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("ပြေစာ Footer ဒီဇိုင်း", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    ReceiptStyleSelector("စာလုံးပုံစံ", footerStyle, listOf("NORMAL" to "ပုံမှန်", "BOLD" to "ထူ", "ITALIC" to "စောင်း", "BOLD_ITALIC" to "ထူ/စောင်း")) { footerStyle = it }
+                    ReceiptStyleSelector("စာလုံးအရွယ်", footerSize, listOf("SMALL" to "သေး", "MEDIUM" to "အလယ်", "LARGE" to "ကြီး")) { footerSize = it }
+                    ReceiptStyleSelector("နေရာချထားမှု", footerAlign, listOf("LEFT" to "ဘယ်", "CENTER" to "အလယ်", "RIGHT" to "ညာ")) { footerAlign = it }
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Button(
                         onClick = {
@@ -373,6 +389,12 @@ fun SettingsScreen(
                                     headerNote = headerNote.trim(),
                                     footerMessage = footerMessage.trim(),
                                     autoBackupSchedule = backupSchedule,
+                                    receiptHeaderStyle = headerStyle,
+                                    receiptHeaderSize = headerSize,
+                                    receiptHeaderAlign = headerAlign,
+                                    receiptFooterStyle = footerStyle,
+                                    receiptFooterSize = footerSize,
+                                    receiptFooterAlign = footerAlign,
                                 )
                             )
                         },
@@ -1019,5 +1041,27 @@ fun SettingsScreen(
                 viewModel.setStaffClientMode(true)
             }
         )
+    }
+}
+
+
+@Composable
+private fun ReceiptStyleSelector(
+    label: String,
+    selected: String,
+    options: List<Pair<String, String>>,
+    onSelected: (String) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+            items(options) { (value, title) ->
+                FilterChip(
+                    selected = selected == value,
+                    onClick = { onSelected(value) },
+                    label = { Text(title, fontSize = 11.sp) },
+                )
+            }
+        }
     }
 }

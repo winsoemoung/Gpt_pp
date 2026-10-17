@@ -45,25 +45,22 @@ object PdfReceiptHelper {
         var y = 35f
 
         // 1. Store Header
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 20f
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText(storeProfile.storeName, pageWidth / 2f, y, paint)
-        y += 22f
-
-        paint.typeface = Typeface.DEFAULT
-        paint.textSize = 12f
+        ReceiptStyle.apply(paint, storeProfile.receiptHeaderStyle, storeProfile.receiptHeaderSize, storeProfile.receiptHeaderAlign, 20f)
+        val headerX = when (paint.textAlign) { Paint.Align.LEFT -> 30f; Paint.Align.RIGHT -> pageWidth - 30f; else -> pageWidth / 2f }
+        canvas.drawText(storeProfile.storeName, headerX, y, paint)
+        y += paint.textSize + 2f
+        ReceiptStyle.apply(paint, storeProfile.receiptHeaderStyle, storeProfile.receiptHeaderSize, storeProfile.receiptHeaderAlign, 12f)
         if (storeProfile.address.isNotBlank()) {
-            canvas.drawText(storeProfile.address, pageWidth / 2f, y, paint)
-            y += 18f
+            canvas.drawText(storeProfile.address, headerX, y, paint)
+            y += paint.textSize + 4f
         }
         if (storeProfile.phone.isNotBlank()) {
-            canvas.drawText("ဖုန်း: ${storeProfile.phone}", pageWidth / 2f, y, paint)
-            y += 18f
+            canvas.drawText("ဖုန်း: ${storeProfile.phone}", headerX, y, paint)
+            y += paint.textSize + 4f
         }
         if (storeProfile.headerNote.isNotBlank()) {
-            canvas.drawText(storeProfile.headerNote, pageWidth / 2f, y, paint)
-            y += 18f
+            canvas.drawText(storeProfile.headerNote, headerX, y, paint)
+            y += paint.textSize + 4f
         }
 
         y += 10f
@@ -198,10 +195,13 @@ object PdfReceiptHelper {
         y += 10f
 
         // Footer message
-        paint.textAlign = Paint.Align.CENTER
-        paint.textSize = 12f
         val footer = storeProfile.footerMessage.ifBlank { "ဝယ်ယူအားပေးမှုကို အထူးပင် ကျေးဇူးတင်ရှိပါသည်" }
-        canvas.drawText(footer, pageWidth / 2f, y, paint)
+        ReceiptStyle.apply(paint, storeProfile.receiptFooterStyle, storeProfile.receiptFooterSize, storeProfile.receiptFooterAlign, 12f)
+        val footerX = when (paint.textAlign) { Paint.Align.LEFT -> 30f; Paint.Align.RIGHT -> pageWidth - 30f; else -> pageWidth / 2f }
+        footer.split("\n").filter { it.isNotBlank() }.forEach { line ->
+            canvas.drawText(line.trim(), footerX, y, paint)
+            y += paint.textSize + 4f
+        }
 
         pdfDocument.finishPage(page)
 

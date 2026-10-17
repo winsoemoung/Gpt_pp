@@ -75,7 +75,7 @@ object BluetoothPrinterHelper {
         val baseHeaderHeight = 220
         val itemsHeight = (receipt.items.size * 55) + 60
         val summaryHeight = 260
-        val footerLines = profile.footerMessage.split("\n").size
+        val footerLines = profile.footerMessage.split("\n").count { it.isNotBlank() }.coerceAtLeast(1)
         val footerHeight = (footerLines * 30) + 120
         val totalHeight = baseHeaderHeight + itemsHeight + summaryHeight + footerHeight
 
@@ -85,21 +85,24 @@ object BluetoothPrinterHelper {
 
         var y = 35f
 
-        // 1. Store Name (Large Bold Centered)
-        canvas.drawText(profile.storeName, width / 2f, y, paintTitle)
-        y += 34f
+        // 1. Store header (style and alignment are user-configurable)
+        ReceiptStyle.apply(paintTitle, profile.receiptHeaderStyle, profile.receiptHeaderSize, profile.receiptHeaderAlign, 32f)
+        val headerX = when (paintTitle.textAlign) { Paint.Align.LEFT -> 20f; Paint.Align.RIGHT -> width - 20f; else -> width / 2f }
+        canvas.drawText(profile.storeName, headerX, y, paintTitle)
+        y += paintTitle.textSize + 8f
 
         if (profile.headerNote.isNotBlank()) {
-            canvas.drawText(profile.headerNote, width / 2f, y, paintHeader)
-            y += 28f
+            ReceiptStyle.apply(paintHeader, profile.receiptHeaderStyle, profile.receiptHeaderSize, profile.receiptHeaderAlign, 21f)
+            canvas.drawText(profile.headerNote, headerX, y, paintHeader)
+            y += paintHeader.textSize + 8f
         }
         if (profile.address.isNotBlank()) {
-            canvas.drawText(profile.address, width / 2f, y, paintHeader)
-            y += 28f
+            canvas.drawText(profile.address, headerX, y, paintHeader)
+            y += paintHeader.textSize + 8f
         }
         if (profile.phone.isNotBlank()) {
-            canvas.drawText("ဖုန်း: ${profile.phone}", width / 2f, y, paintHeader)
-            y += 32f
+            canvas.drawText("ဖုန်း: ${profile.phone}", headerX, y, paintHeader)
+            y += paintHeader.textSize + 10f
         }
 
         // Divider
@@ -119,8 +122,8 @@ object BluetoothPrinterHelper {
         y += 26f
         canvas.drawText("ပစ္စည်းအမည်", 20f, y, paintBodyBold)
         canvas.drawText("အရေအတွက်", 285f, y, paintBodyBold)
-        canvas.drawText("နှုန်း", 380f, y, paintBodyBold)
-        canvas.drawText("သင့်ငွေ", 490f, y, paintBodyBold)
+        canvas.drawText("နှုန်း", 395f, y, paintBodyBold)
+        canvas.drawText("သင့်ငွေ", 515f, y, paintBodyBold)
         y += 26f
         drawDashedLine(canvas, y, width)
         y += 30f
@@ -137,8 +140,8 @@ object BluetoothPrinterHelper {
             y += 24f
 
             canvas.drawText("${line.quantity}", 285f, y, paintBody)
-            canvas.drawText("%,d".format(line.unitPriceMinor), 380f, y, paintBody)
-            canvas.drawText("%,d".format(line.lineTotalMinor), 480f, y, paintBodyBold)
+            canvas.drawText("%,d".format(line.unitPriceMinor), 395f, y, paintBody)
+            canvas.drawText("%,d".format(line.lineTotalMinor), 515f, y, paintBodyBold)
             y += 30f
         }
 
@@ -188,10 +191,12 @@ object BluetoothPrinterHelper {
         y += 30f
 
         // Footer
+        ReceiptStyle.apply(paintHeader, profile.receiptFooterStyle, profile.receiptFooterSize, profile.receiptFooterAlign, 21f)
+        val footerX = when (paintHeader.textAlign) { Paint.Align.LEFT -> 20f; Paint.Align.RIGHT -> width - 20f; else -> width / 2f }
         profile.footerMessage.split("\n").forEach { line ->
             if (line.isNotBlank()) {
-                canvas.drawText(line.trim(), width / 2f, y, paintHeader)
-                y += 28f
+                canvas.drawText(line.trim(), footerX, y, paintHeader)
+                y += paintHeader.textSize + 7f
             }
         }
         y += 10f
