@@ -584,7 +584,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Button(
-                            onClick = { googleSignInLauncher.launch(viewModel.googleSignInIntent()) },
+                            onClick = { viewModel.beginGoogleSignIn { intent -> googleSignInLauncher.launch(intent) } },
                             modifier = Modifier.fillMaxWidth().testTag("connect_google_account_button"),
                             shape = RoundedCornerShape(8.dp)
                         ) {

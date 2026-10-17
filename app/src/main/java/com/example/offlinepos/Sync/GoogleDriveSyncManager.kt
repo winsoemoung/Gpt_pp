@@ -6,6 +6,8 @@ import com.example.offlinepos.data.local.AppDatabase
 import com.google.android.gms.auth.GoogleAuthUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -13,12 +15,14 @@ import java.net.URL
 
 class GoogleDriveSyncManager(private val context: Context) {
     companion object {
+        private val uploadMutex = Mutex()
         private const val DRIVE_SCOPE = "oauth2:https://www.googleapis.com/auth/drive.appdata"
         private const val BACKUP_NAME = "offline_pos_backup.db"
     }
 
     suspend fun uploadLatestBackup(accountEmail: String): Result<Long> = withContext(Dispatchers.IO) {
-        runCatching {
+        uploadMutex.withLock {
+            runCatching {
             val token = GoogleAuthUtil.getToken(context, Account(accountEmail, "com.google"), DRIVE_SCOPE)
             val db = AppDatabase.get(context)
             val backupManager = BackupManager(db) { System.currentTimeMillis() }
@@ -33,6 +37,7 @@ class GoogleDriveSyncManager(private val context: Context) {
             }
             if (responseCode !in 200..299) error("Google Drive upload failed: HTTP $responseCode")
             file.length()
+            }
         }
     }
 
