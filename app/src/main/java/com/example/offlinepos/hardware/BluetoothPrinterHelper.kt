@@ -15,6 +15,7 @@ import com.example.offlinepos.ui.ReceiptData
 import com.example.offlinepos.ui.StoreProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -24,6 +25,47 @@ import java.util.UUID
 object BluetoothPrinterHelper {
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     const val PRINTER_WIDTH_DOTS = 576 // 80mm standard: 576 dots (72 bytes)
+    private const val PREFS = "bluetooth_printer_prefs"
+    private const val SELECTED_ADDRESS = "selected_printer_address"
+
+    fun selectedPrinterAddress(context: Context): String? = context
+        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .getString(SELECTED_ADDRESS, null)
+
+    fun selectPrinter(context: Context, device: BluetoothDevice) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(SELECTED_ADDRESS, device.address)
+            .apply()
+    }
+
+    @SuppressLint("MissingPermission")
+    fun requestPairing(device: BluetoothDevice): Boolean = try {
+        device.bondState == BluetoothDevice.BOND_BONDED || device.createBond()
+    } catch (_: SecurityException) { false }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun connectWithRetry(device: BluetoothDevice): BluetoothSocket {
+        var lastError: Throwable? = null
+        repeat(3) { attempt ->
+            var socket: BluetoothSocket? = null
+            try {
+                if (device.bondState != BluetoothDevice.BOND_BONDED) {
+                    if (!requestPairing(device)) error("Printer is not paired")
+                    delay(700L)
+                }
+                BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
+                socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                socket.connect()
+                if (socket.isConnected) return socket
+                error("Printer socket is not connected")
+            } catch (t: Throwable) {
+                lastError = t
+                try { socket?.close() } catch (_: Exception) {}
+                if (attempt < 2) delay(400L * (1L shl attempt))
+            }
+        }
+        throw lastError ?: IllegalStateException("Unable to connect to printer")
+    }
 
     @SuppressLint("MissingPermission")
     fun getPairedDevices(context: Context): List<BluetoothDevice> {
@@ -279,8 +321,7 @@ object BluetoothPrinterHelper {
             val bitmap = renderReceiptBitmap(receipt, profile)
             val rasterData = convertBitmapToEscPos(bitmap)
 
-            socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            socket.connect()
+            socket = connectWithRetry(device)
             outputStream = socket.outputStream
 
             // Send Init, Print Bitmap, Feed & Cut Paper, Kick Cash Drawer

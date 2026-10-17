@@ -1,23 +1,45 @@
 package com.example.offlinepos.Sync
 
-import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.example.offlinepos.data.local.AppDatabase
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.security.MessageDigest
 class BackupManager(
     private val db: AppDatabase,
     private val now: () -> Long,
 ) {
-    suspend fun quiesce() = db.withTransaction {
-        val sql = SimpleSQLiteQuery("PRAGMA wal_checkpoint(TRUNCATE)")
-        db.openHelper.writableDatabase.query(sql).use { it.moveToFirst() }
+    private val snapshotMutex = Mutex()
+
+    suspend fun quiesce() = snapshotMutex.withLock {
+        db.openHelper.writableDatabase.execSQL("PRAGMA busy_timeout=30000")
+        db.openHelper.writableDatabase.query(SimpleSQLiteQuery("PRAGMA wal_checkpoint(PASSIVE)"))
+            .use { it.moveToFirst() }
     }
     suspend fun snapshot(target: File) {
         require(target.parentFile?.exists() == true)
-        db.openHelper.writableDatabase
-            .query(SimpleSQLiteQuery("VACUUM INTO ?", arrayOf(target.absolutePath)))
-            .use { it.moveToFirst() }
+        snapshotMutex.withLock {
+            db.openHelper.writableDatabase.execSQL("PRAGMA busy_timeout=30000")
+            var lastError: Throwable? = null
+            repeat(4) { attempt ->
+                val temp = File(target.parentFile, ".${target.name}.tmp.$attempt")
+                temp.delete()
+                try {
+                    db.openHelper.writableDatabase
+                        .query(SimpleSQLiteQuery("VACUUM INTO ?", arrayOf(temp.absolutePath)))
+                        .use { it.moveToFirst() }
+                    if (!temp.renameTo(target)) error("Unable to finalize database snapshot")
+                    return
+                } catch (t: Throwable) {
+                    lastError = t
+                    temp.delete()
+                    if (attempt < 3) delay(250L * (1L shl attempt))
+                }
+            }
+            throw lastError ?: IllegalStateException("Database snapshot failed")
+        }
     }
     fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")

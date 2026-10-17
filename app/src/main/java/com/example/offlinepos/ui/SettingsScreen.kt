@@ -1,5 +1,9 @@
 package com.example.offlinepos.ui
 import android.app.Activity
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.pm.PackageManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -9,8 +13,10 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.offlinepos.hardware.QrCodeHelper
+import com.example.offlinepos.hardware.BluetoothPrinterHelper
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +68,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -149,6 +156,20 @@ fun SettingsScreen(
         }
     }
 
+    var pairedPrinters by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
+    var selectedPrinterAddress by remember { mutableStateOf(BluetoothPrinterHelper.selectedPrinterAddress(context)) }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { pairedPrinters = BluetoothPrinterHelper.getPairedDevices(context) }
+    fun refreshBluetoothPrinters() {
+        val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION)
+        val missing = permissions.filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) bluetoothPermissionLauncher.launch(missing.toTypedArray())
+        else pairedPrinters = BluetoothPrinterHelper.getPairedDevices(context)
+    }
+
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -196,6 +217,42 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.testTag("settings_candlestick_switch"),
                     )
+                }
+            }
+
+            // Bluetooth thermal printer manager
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("🖨️ Bluetooth Printer Manager", fontWeight = FontWeight.Bold)
+                    Text("Pair လုပ်ထားသော ESC/POS printer ကိုရွေးပြီး connection retry ကို အသုံးပြုနိုင်ပါသည်", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Bluetooth: ${if (BluetoothAdapter.getDefaultAdapter()?.isEnabled == true) "ON" else "OFF"}", style = MaterialTheme.typography.labelMedium)
+                        OutlinedButton(onClick = { refreshBluetoothPrinters() }, modifier = Modifier.height(34.dp)) { Text("Refresh", fontSize = 11.sp) }
+                    }
+                    if (pairedPrinters.isEmpty()) {
+                        Text("Paired printer မတွေ့ပါ။ Android Bluetooth permission နှင့် pairing ကို ခွင့်ပြုပါ။", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    } else {
+                        pairedPrinters.forEach { device ->
+                            val address = runCatching { device.address }.getOrDefault("")
+                            val name = runCatching { device.name ?: "Unnamed printer" }.getOrDefault("Unnamed printer")
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                    Text(address, style = MaterialTheme.typography.labelSmall)
+                                }
+                                TextButton(onClick = { BluetoothPrinterHelper.selectPrinter(context, device); selectedPrinterAddress = address }) {
+                                    Text(if (selectedPrinterAddress == address) "Selected" else "Use", fontSize = 11.sp)
+                                }
+                                TextButton(onClick = { BluetoothPrinterHelper.requestPairing(device); refreshBluetoothPrinters() }) { Text("Pair", fontSize = 11.sp) }
+                            }
+                        }
+                    }
+                    if (selectedPrinterAddress != null) Text("Selected printer: $selectedPrinterAddress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
 

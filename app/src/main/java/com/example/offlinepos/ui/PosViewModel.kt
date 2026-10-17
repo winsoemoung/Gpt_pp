@@ -1168,11 +1168,13 @@ class PosViewModel(private val context: Context) : ViewModel() {
     val lastGoogleBackupTime: StateFlow<Long> = _lastGoogleBackupTime.asStateFlow()
     private val driveSyncManager = GoogleDriveSyncManager(context.applicationContext)
 
-    fun googleSignInIntent(): Intent {
-        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+    private fun googleSignInOptions(): GoogleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
             .build()
+
+    fun googleSignInIntent(): Intent {
+        val options = googleSignInOptions()
         return GoogleSignIn.getClient(context, options).signInIntent
     }
 
@@ -1212,7 +1214,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
     private fun enqueueGoogleDriveSync() {
         WorkManager.getInstance(context).enqueueUniqueWork(
             "google-drive-sync-now",
-            androidx.work.ExistingWorkPolicy.REPLACE,
+            androidx.work.ExistingWorkPolicy.KEEP,
             androidx.work.OneTimeWorkRequestBuilder<GoogleDriveSyncWorker>()
                 .setConstraints(GoogleDriveSyncWorker.constraints())
                 .build(),
@@ -1234,6 +1236,7 @@ class PosViewModel(private val context: Context) : ViewModel() {
         storeConfig.clearGoogleAccount()
         _googleAccount.value = null
         WorkManager.getInstance(context).cancelUniqueWork("google-drive-sync-now")
+        GoogleSignIn.getClient(context, googleSignInOptions()).signOut()
         setBanner("Google အကောင့် ချိတ်ဆက်မှု ဖြုတ်ပြီးပါပြီ")
     }
 

@@ -5,6 +5,7 @@ import android.content.Context
 import com.example.offlinepos.data.local.AppDatabase
 import com.google.android.gms.auth.GoogleAuthUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -18,22 +19,25 @@ class GoogleDriveSyncManager(private val context: Context) {
     }
 
     suspend fun uploadLatestBackup(accountEmail: String): Result<Long> = withContext(Dispatchers.IO) {
-        runCatching {
-            val token = GoogleAuthUtil.getToken(context, Account(accountEmail, "com.google"), DRIVE_SCOPE)
-            val db = AppDatabase.get(context)
-            val backupManager = BackupManager(db) { System.currentTimeMillis() }
-            val file = File(context.cacheDir, BACKUP_NAME)
-            backupManager.quiesce()
-            backupManager.snapshot(file)
-            val existingId = findBackupId(token)
-            val responseCode = if (existingId == null) {
-                createBackup(token, file)
-            } else {
-                updateBackup(token, existingId, file)
+        var lastError: Throwable? = null
+        repeat(3) { attempt ->
+            try {
+                val token = GoogleAuthUtil.getToken(context, Account(accountEmail, "com.google"), DRIVE_SCOPE)
+                val db = AppDatabase.get(context)
+                val backupManager = BackupManager(db) { System.currentTimeMillis() }
+                val file = File(context.cacheDir, BACKUP_NAME)
+                backupManager.quiesce()
+                backupManager.snapshot(file)
+                val existingId = findBackupId(token)
+                val responseCode = if (existingId == null) createBackup(token, file) else updateBackup(token, existingId, file)
+                if (responseCode !in 200..299) error("Google Drive upload failed: HTTP $responseCode")
+                return@withContext Result.success(file.length())
+            } catch (t: Throwable) {
+                lastError = t
+                if (attempt < 2) delay(1000L * (attempt + 1))
             }
-            if (responseCode !in 200..299) error("Google Drive upload failed: HTTP $responseCode")
-            file.length()
         }
+        Result.failure(lastError ?: IllegalStateException("Google Drive upload failed"))
     }
 
     private fun findBackupId(token: String): String? {
