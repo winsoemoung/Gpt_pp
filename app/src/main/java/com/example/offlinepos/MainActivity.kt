@@ -1,9 +1,16 @@
 package com.example.offlinepos
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.offlinepos.Sync.WeeklyRecommendationWorker
+import java.util.concurrent.TimeUnit
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -60,7 +67,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 787)
+        }
         val viewModel = PosViewModel(applicationContext)
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "weekly_stock_recommendation",
+            ExistingPeriodicWorkPolicy.KEEP,
+            PeriodicWorkRequestBuilder<WeeklyRecommendationWorker>(7, TimeUnit.DAYS).build(),
+        )
 
         setContent {
             OfflinePOSTheme {

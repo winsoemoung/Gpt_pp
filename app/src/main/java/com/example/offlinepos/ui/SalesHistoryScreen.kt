@@ -1073,6 +1073,19 @@ fun ReorderAndPeriodicReportView(
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            "Weekly Gemini recommendation: app ဖွင့်ချိန်မှစ၍ ၇ ရက်တစ်ကြိမ် notification ထုတ်ပေးမည်",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                            fontSize = 10.5.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = {

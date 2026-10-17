@@ -108,6 +108,15 @@ The current `main` branch includes a premium industrial-materials visual refresh
 - AI request is analysis-only and does not execute stock or price changes.
 - Version 5.1.0 / versionCode 10.
 
+## New5-5 receipt and weekly AI update
+
+- Removed the app/store image logo from both PDF receipt export and Bluetooth thermal receipt printing; store text header remains unchanged.
+- Receipt item columns now keep quantity close to the product name while separating quantity, unit rate, and amount with dedicated positions.
+- Added an automatic weekly WorkManager recommendation job. It analyzes the latest 7 days of net sales and requests a Burmese Gemini recommendation when an API key is available.
+- The weekly job falls back to offline reorder/90-day forecast logic and posts a notification if Gemini is unavailable.
+- Added Android notification permission handling and a Compose status card explaining the weekly recommendation schedule.
+- Version 5.1.1 / versionCode 11.
+
 ### New5-4 forecast scope
 
 - Supplier lead time, purchase orders, holidays, and weather are not yet modeled because those data fields are not present in the current database.
